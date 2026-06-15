@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>割り勘電卓 — 小さいラボ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Zen Kaku Gothic New', sans-serif;
+      color: #1a2340;
+      min-height: 100vh;
+      background-color: #f4f4ee;
+      background-image:
+        linear-gradient(rgba(26,35,100,0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(26,35,100,0.07) 1px, transparent 1px);
+      background-size: 28px 28px;
+      padding: 28px 16px 56px;
+    }
+
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      margin-bottom: 28px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #1a2340;
+    }
+
+    .eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      opacity: 0.4;
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      font-family: 'Space Mono', monospace;
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .h1-accent { background: #fff176; padding: 0 5px 2px; }
+
+    /* ── Input list ── */
+    #person-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .person-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .person-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      color: rgba(26,35,64,0.45);
+      width: 24px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .amount-box {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      border: 1.5px solid #1a2340;
+      background: #fff;
+      border-radius: 1px;
+    }
+
+    .amount-box:focus-within {
+      box-shadow: 2px 2px 0 #fff176;
+    }
+
+    .yen {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: rgba(26,35,64,0.4);
+      padding: 0 8px;
+      user-select: none;
+    }
+
+    .amount-box input {
+      flex: 1;
+      font-family: 'Space Mono', monospace;
+      font-size: 16px;
+      color: #1a2340;
+      border: none;
+      outline: none;
+      background: transparent;
+      padding: 9px 8px 9px 0;
+      width: 100%;
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    .btn-remove {
+      width: 30px;
+      height: 30px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: 1.5px solid rgba(26,35,64,0.25);
+      border-radius: 1px;
+      cursor: pointer;
+      font-size: 15px;
+      color: rgba(26,35,64,0.35);
+      transition: all 0.1s;
+    }
+    .btn-remove:hover { background: #fff176; border-color: #1a2340; color: #1a2340; }
+
+    /* ── Add / Calc buttons ── */
+    .btn-add {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      background: none;
+      border: 1.5px dashed rgba(26,35,64,0.3);
+      border-radius: 1px;
+      padding: 8px 14px;
+      cursor: pointer;
+      color: rgba(26,35,64,0.55);
+      margin-bottom: 20px;
+      display: block;
+      transition: all 0.1s;
+    }
+    .btn-add:hover { background: #fff176; border-color: #1a2340; color: #1a2340; }
+
+    .btn-calc {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: #1a2340;
+      color: #fff;
+      border: none;
+      border-radius: 1px;
+      padding: 14px;
+      width: 100%;
+      cursor: pointer;
+      margin-bottom: 24px;
+      transition: background 0.1s;
+    }
+    .btn-calc:hover { background: #2e3f6e; }
+    .btn-calc:active { background: #111827; }
+
+    /* ── Result ── */
+    #result { display: none; }
+
+    .result-divider {
+      border: none;
+      border-top: 1.5px solid #1a2340;
+      margin-bottom: 14px;
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px dashed rgba(26,35,64,0.15);
+    }
+    .result-row:last-of-type { border-bottom: none; }
+
+    .result-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: rgba(26,35,64,0.4);
+      width: 28px;
+    }
+
+    .result-amount {
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .result-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0 0;
+      margin-top: 4px;
+      border-top: 1.5px solid #1a2340;
+    }
+
+    .result-total-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      opacity: 0.5;
+    }
+
+    .result-total-amount {
+      font-family: 'Space Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      background: #fff176;
+      padding: 2px 8px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 36px;
+      text-align: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: rgba(26,35,64,0.3);
+    }
+    footer a { color: inherit; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="eyebrow">小さいラボ — Tool No.001</div>
+    <h1><span class="h1-accent">割り勘</span>電卓</h1>
+  </header>
+
+  <div id="person-list"></div>
+
+  <button class="btn-add" onclick="addPerson()">＋ 人を追加</button>
+
+  <button class="btn-calc" onclick="calculate()">計算する →</button>
+
+  <div id="result">
+    <div id="result-list"></div>
+    <div class="result-total-row">
+      <span class="result-total-label">合計</span>
+      <span class="result-total-amount" id="grand-total"></span>
+    </div>
+    <div class="result-total-row" style="border-top: 1px dashed rgba(26,35,64,0.25); margin-top: 8px; padding-top: 10px;">
+      <span class="result-total-label">均等割り（1人あたり）</span>
+      <span class="result-total-amount" id="per-person" style="background: none;"></span>
+    </div>
+  </div>
+
+  <footer><a href="https://kouki0822.github.io">← 小さいラボへ戻る</a></footer>
+
+</div>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    addPerson(); addPerson();
+    document.querySelector('.amount-box input').focus();
+  });
+
+  function addPerson() {
+    const list = document.getElementById('person-list');
+    const n = list.children.length + 1;
+    const row = document.createElement('div');
+    row.className = 'person-row';
+    row.innerHTML = `
+      <span class="person-num">${n}.</span>
+      <div class="amount-box">
+        <span class="yen">¥</span>
+        <input type="number" inputmode="numeric" min="0" step="1" placeholder="0">
+      </div>
+      <button class="btn-remove" onclick="removePerson(this)">×</button>
+    `;
+    list.appendChild(row);
+    if (n > 1) row.querySelector('input').focus();
+  }
+
+  function removePerson(btn) {
+    const list = document.getElementById('person-list');
+    if (list.children.length <= 1) return;
+    btn.closest('.person-row').remove();
+    renumber();
+  }
+
+  function renumber() {
+    document.querySelectorAll('.person-num').forEach((el, i) => {
+      el.textContent = (i + 1) + '.';
+    });
+  }
+
+  function calculate() {
+    const inputs = document.querySelectorAll('.person-row input');
+    const amounts = Array.from(inputs).map(el => Math.round(parseFloat(el.value) || 0));
+    const total   = amounts.reduce((s, v) => s + v, 0);
+
+    const listEl = document.getElementById('result-list');
+    listEl.innerHTML = '';
+    amounts.forEach((amt, i) => {
+      const row = document.createElement('div');
+      row.className = 'result-row';
+      row.innerHTML = `
+        <span class="result-num">${i + 1}.</span>
+        <span class="result-amount">¥${amt.toLocaleString()}</span>
+      `;
+      listEl.appendChild(row);
+    });
+
+    document.getElementById('grand-total').textContent = '¥' + total.toLocaleString();
+    const perPerson = Math.round(total / amounts.length);
+    document.getElementById('per-person').textContent = '¥' + perPerson.toLocaleString();
+
+    const resultEl = document.getElementById('result');
+    resultEl.style.display = 'block';
+    resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>
