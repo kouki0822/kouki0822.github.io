@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  小さいラボ  -  about.html                                    ║
+  ║                                                              ║
+  ║  ★ よく編集する場所には ★ マークを付けています。              ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — 小さいラボ</title>
+  <meta name="description" content="小さいラボ うp主のページ" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --paper:  #FBFAF6;
+      --ink:    #16213E;
+      --grid:   rgba(22, 33, 62, 0.06);
+      --accent: #2F5BFF;
+      --marker: #FFD23F;
+      --muted:  #5B647E;
+      --line:   rgba(22, 33, 62, 0.14);
+      --card:   #FFFFFF;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Zen Kaku Gothic New", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 26px 26px;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+    /* ===== ナビ ===== */
+    nav {
+      padding: 24px 0 0;
+    }
+    nav a {
+      font-family: "Space Mono", monospace;
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+    }
+    nav a:hover { text-decoration: underline; }
+
+    /* ===== ヘッダー ===== */
+    header {
+      padding: 52px 0 48px;
+      border-bottom: 2px solid var(--ink);
+    }
+    .eyebrow {
+      font-family: "Space Mono", monospace;
+      font-size: 13px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: clamp(36px, 8vw, 60px);
+      font-weight: 900;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+    }
+    h1 .hl {
+      background: linear-gradient(transparent 58%, var(--marker) 58%, var(--marker) 92%, transparent 92%);
+      padding: 0 0.06em;
+    }
+
+    /* ===== メインコンテンツ ===== */
+    main { padding: 52px 0 40px; }
+
+    .section {
+      margin-bottom: 52px;
+    }
+    .section-label {
+      font-family: "Space Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .section-label::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--line);
+    }
+
+    /* ===== アバター + 名前エリア ===== */
+    .profile-head {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-bottom: 28px;
+    }
+    /* ★ アバター画像。画像がなければこのブロックを削除してOK */
+    .avatar {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      border: 2px solid var(--ink);
+      background: var(--card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      flex-shrink: 0;
+    }
+    .handle {
+      font-family: "Space Mono", monospace;
+      font-size: clamp(22px, 5vw, 32px);
+      font-weight: 700;
+    }
+    .handle-sub {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ===== 本文テキスト ===== */
+    .bio {
+      font-size: 16px;
+      line-height: 1.85;
+      color: var(--ink);
+      max-width: 38em;
+    }
+    .bio + .bio { margin-top: 1em; }
+
+    /* ===== タグ（スキル・興味） ===== */
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .tag {
+      font-family: "Space Mono", monospace;
+      font-size: 12px;
+      color: var(--ink);
+      border: 1.5px solid var(--ink);
+      border-radius: 999px;
+      padding: 5px 14px;
+    }
+
+    /* ===== リンク一覧 ===== */
+    .links {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .link-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 20px;
+      text-decoration: none;
+      color: var(--ink);
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .link-item:hover {
+      border-color: var(--ink);
+      transform: translateX(4px);
+    }
+    .link-icon {
+      font-family: "Space Mono", monospace;
+      font-size: 13px;
+      color: var(--accent);
+      min-width: 70px;
+      letter-spacing: 0.05em;
+    }
+    .link-label {
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .link-desc {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .link-arrow {
+      margin-left: auto;
+      font-size: 18px;
+      color: var(--muted);
+    }
+
+    /* ===== ラボについて ===== */
+    .card-plain {
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      padding: 28px 24px;
+    }
+    .card-plain p {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.85;
+    }
+    .card-plain p + p { margin-top: 1em; }
+
+    /* ===== フッター ===== */
+    footer {
+      border-top: 2px solid var(--ink);
+      padding: 36px 0 60px;
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    footer a { color: var(--accent); font-weight: 700; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .copy { font-family: "Space Mono", monospace; font-size: 12px; color: var(--muted); }
+
+    /* ===== アニメーション ===== */
+    .fade { opacity: 0; transform: translateY(14px); animation: rise 0.55s ease forwards; }
+    .fade:nth-child(2) { animation-delay: 0.07s; }
+    .fade:nth-child(3) { animation-delay: 0.14s; }
+    @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+      .fade { opacity: 1; transform: none; }
+    }
+
+    a:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="wrap">
+    <nav>
+      <a href="index.html">← 小さいラボ トップへ</a>
+    </nav>
+  </div>
+
+  <!-- ===== ヘッダー ===== -->
+  <header>
+    <div class="wrap">
+      <p class="eyebrow fade">About</p>
+      <h1 class="fade">うp主の<span class="hl">ページ</span></h1>
+    </div>
+  </header>
+
+  <!-- ===== メイン ===== -->
+  <main>
+    <div class="wrap">
+
+      <!-- プロフィール -->
+      <section class="section">
+        <p class="section-label">Profile</p>
+        <div class="profile-head">
+          <!-- ★ アイコン絵文字。好きなものに変えてOK。画像を使うなら <img> に置き換える -->
+          <div class="avatar">🧪</div>
+          <div>
+            <!-- ★ ハンドルネームや呼ばれたい名前に変える -->
+            <p class="handle">small-lab</p>
+            <p class="handle-sub">AIと一緒につくる人</p>
+          </div>
+        </div>
+
+        <!-- ★ 自己紹介文。自由に書き換えてください -->
+        <p class="bio">AIをつかって、小さなアプリやWebアプリをひたすらつくっています。プログラミングの経験はほぼゼロからのスタート。作ったものはぜんぶここで公開しています。</p>
+        <p class="bio">「動けばいい」を合言葉に、思いついたらとりあえず形にして放出するスタイル。コードは全部GitHubで公開中なので、気になったものは自由に使ってください。</p>
+
+        <!-- ★ タグ。自分の興味・使っているツールなどに書き換え -->
+        <div class="tags">
+          <span class="tag">AI vibe coding</span>
+          <span class="tag">Claude</span>
+          <span class="tag">HTML / CSS / JS</span>
+          <span class="tag">GitHub Pages</span>
+        </div>
+      </section>
+
+      <!-- リンク -->
+      <section class="section">
+        <p class="section-label">Links</p>
+        <div class="links">
+
+          <!-- ★ GitHubのURLをあなたのものに変える -->
+          <a class="link-item" href="https://github.com/kouki0822" target="_blank" rel="noopener">
+            <span class="link-icon">GitHub</span>
+            <div>
+              <p class="link-label">github.com/kouki0822</p>
+              <p class="link-desc">つくったものは全部ここにあります</p>
+            </div>
+            <span class="link-arrow">→</span>
+          </a>
+
+          <!-- ★ SNSを追加したい場合はここをコピペして増やす。不要なら削除 -->
+          <!--
+          <a class="link-item" href="https://twitter.com/あなたのID" target="_blank" rel="noopener">
+            <span class="link-icon">X / Twitter</span>
+            <div>
+              <p class="link-label">@あなたのID</p>
+              <p class="link-desc">つくったものの進捗など</p>
+            </div>
+            <span class="link-arrow">→</span>
+          </a>
+          -->
+
+        </div>
+      </section>
+
+      <!-- このラボについて -->
+      <section class="section">
+        <p class="section-label">このラボについて</p>
+        <div class="card-plain">
+          <p>「小さいラボ」は、AIと一緒につくった小さなアプリやWebアプリを放出していく場所です。思いついたものを片っぱしから形にして、ここに並べています。</p>
+          <p>コードはすべてGitHubで公開しています。使いたい・改造したい・参考にしたい、なんでも自由にどうぞ。</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ===== フッター ===== -->
+  <footer>
+    <div class="wrap" style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; width:100%;">
+      <a href="index.html">← トップへもどる</a>
+      <span class="copy">© 2026 小さいラボ</span>
+    </div>
+  </footer>
+
+</body>
+</html>
