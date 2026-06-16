@@ -98,8 +98,54 @@
 
   /* annotations */
   .ann{position:absolute;box-sizing:border-box}
-  .ann.text{white-space:pre-wrap;line-height:1.25;cursor:move;padding:1px 2px;color:#111;min-width:8px;font-family:'Noto Sans JP',sans-serif}
+  .ann.text{white-space:pre-wrap;line-height:1.3;cursor:move;padding:1px 2px;color:#111;min-width:8px;font-family:'Noto Sans JP',sans-serif;transform-origin:top left;word-break:break-word;box-sizing:border-box;outline:none}
   .ann.text.mincho{font-family:'Noto Serif JP',serif}
+  .ann.text.maru{font-family:'Kosugi Maru','Noto Sans JP',sans-serif}
+  .ann.text.editing{cursor:text;outline:1px dashed rgba(58,109,240,.7);outline-offset:1px;background:rgba(58,109,240,.05)}
+
+  /* ---- selection box overlay ---- */
+  .sel-box{
+    position:absolute;pointer-events:none;z-index:30;
+    border:1.5px dashed var(--accent);border-radius:2px;box-sizing:border-box;
+  }
+  /* 8 round handles: NW N NE W E SW S SE */
+  .sel-handle{
+    position:absolute;width:14px;height:14px;border-radius:50%;
+    background:#fff;border:2px solid var(--accent);
+    box-shadow:0 0 0 1px #fff,0 2px 4px rgba(16,28,43,.2);
+    z-index:31;pointer-events:all;cursor:nwse-resize;transform:translate(-50%,-50%);
+  }
+  .sel-handle[data-h="n"],.sel-handle[data-h="s"]{cursor:ns-resize}
+  .sel-handle[data-h="w"],.sel-handle[data-h="e"]{cursor:ew-resize}
+  .sel-handle[data-h="nw"],.sel-handle[data-h="se"]{cursor:nwse-resize}
+  .sel-handle[data-h="ne"],.sel-handle[data-h="sw"]{cursor:nesw-resize}
+  .sel-rotate{
+    position:absolute;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);border:2px solid #fff;
+    box-shadow:0 0 0 1px var(--accent),0 2px 6px rgba(58,109,240,.4);
+    z-index:31;pointer-events:all;cursor:grab;transform:translate(-50%,-50%);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;
+  }
+
+  /* ---- floating format bar ---- */
+  .fmt-bar{
+    position:fixed;z-index:70;background:var(--chrome);color:#fff;
+    border-radius:10px;display:flex;align-items:center;gap:1px;padding:4px 6px;
+    box-shadow:0 4px 20px rgba(16,28,43,.45);flex-wrap:nowrap;white-space:nowrap;
+    pointer-events:all;user-select:none;
+  }
+  .fmt-bar button,.fmt-bar select,.fmt-bar input{
+    height:28px;border:none;border-radius:6px;background:transparent;
+    color:#dce5f0;font-family:inherit;font-size:12px;font-weight:600;
+    padding:0 6px;cursor:pointer;transition:background .1s;
+  }
+  .fmt-bar button:hover,.fmt-bar select:hover{background:var(--chrome-2)}
+  .fmt-bar button.on{background:var(--accent);color:#fff}
+  .fmt-bar select{background:var(--chrome-2);max-width:90px}
+  .fmt-bar input[type=color]{width:28px;padding:0 2px}
+  .fmt-bar input[type=number]{width:48px;background:var(--chrome-2);border-radius:6px;text-align:center;color:#fff}
+  .fmt-bar .sep{width:1px;height:20px;background:rgba(255,255,255,.15);margin:0 3px;flex-shrink:0}
+  .fmt-bar .drag-handle{cursor:move;color:rgba(255,255,255,.3);padding:0 2px;font-size:16px;line-height:1}
   .ann.highlight{background:rgba(255,221,87,.42);mix-blend-mode:multiply;cursor:move}
   .ann.underline{cursor:move}
   .ann.underline .ul{position:absolute;left:0;right:0;bottom:1px;height:2px;background:#e8552d}
@@ -109,25 +155,11 @@
   .ann.whiteout{background:#fff;cursor:move}
   .ann.comment{cursor:move;display:flex;align-items:center;justify-content:center}
   .ann.comment .pin{width:24px;height:24px;border-radius:50% 50% 50% 2px;background:var(--warn);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;transform:rotate(0)}
-  .ann.selected{outline:2px solid var(--accent);outline-offset:1px}
-  .handle{position:absolute;width:13px;height:13px;background:#fff;border:2px solid var(--accent);border-radius:3px;right:-7px;bottom:-7px;cursor:nwse-resize;z-index:5}
 
   /* edit-text run boxes */
   .runbox{position:absolute;cursor:text;background:transparent;pointer-events:none}
   .annolayer.edit-mode .runbox{pointer-events:auto;outline:1px dashed rgba(58,109,240,.5);outline-offset:0;background:rgba(58,109,240,.045);border-radius:2px}
   .annolayer.edit-mode .runbox:hover{background:rgba(58,109,240,.16);outline-color:rgba(58,109,240,.95)}
-
-  /* inline editors */
-  .inline-input{position:absolute;z-index:60;border:1px solid var(--accent);border-radius:6px;padding:4px 6px;font-family:inherit;box-shadow:var(--shadow);background:#fff;color:#111;resize:none;line-height:1.25;min-width:60px}
-  .inline-toolbar{
-    position:absolute;z-index:61;background:var(--chrome);color:#fff;border-radius:8px;display:flex;gap:2px;padding:4px;box-shadow:var(--shadow);
-  }
-  .inline-toolbar button{height:26px;min-width:26px;padding:0 6px;border:none;border-radius:5px;background:transparent;color:#dce5f0;font-size:13px;font-weight:600}
-  .inline-toolbar button:hover{background:var(--chrome-2)}
-  .inline-toolbar button.on{background:var(--accent);color:#fff}
-  .inline-toolbar input[type=color]{width:26px;height:26px;border:none;background:transparent;padding:0}
-  .inline-toolbar select{height:26px;border:none;border-radius:5px;background:var(--chrome-2);color:#fff;font-size:12px}
-  .inline-toolbar .div{width:1px;background:#3a4a5e;margin:2px 2px}
 
   /* ---------- Properties panel ---------- */
   .props{
@@ -366,6 +398,7 @@ const App = {
   scale: 1.4,
   tool: 'select',
   selected: null,          // selected annotation object
+  selectedPage: null,
   uid: 1,
   fonts: {},               // embedded font bytes cache by kind
   fontTried: {},           // attempted kinds
@@ -531,15 +564,43 @@ function renderAnnos(p){
   // remove existing ann DOM
   [...p.layer.querySelectorAll('.ann')].forEach(n=>n.remove());
   for(const a of p.annos) makeAnnEl(p,a);
+  // restore selection box on this page after re-render
+  if(App.selected && p.annos.includes(App.selected)){
+    App.selectedPage=p;
+    // defer so layout is complete
+    requestAnimationFrame(()=>positionSelBox(App.selected,p));
+  }
+}
+
+/* ============================================================
+   Annotation element creation & style application
+   ============================================================ */
+function fontFamily(f){ return f==='mincho'?"'Noto Serif JP',serif":"'Noto Sans JP',sans-serif"; }
+function hexToRgba(h,al){ const [r,g,b]=hexToRgb01(h); return `rgba(${r*255|0},${g*255|0},${b*255|0},${al})`; }
+
+function applyTextStyle(e,a,s){
+  e.style.left=a.x*s+'px';
+  e.style.top=a.y*s+'px';
+  if(a.w) e.style.width=a.w*s+'px'; else e.style.width='';
+  e.style.fontSize=a.size*s+'px';
+  e.style.lineHeight=a.lineH||1.3;
+  e.style.color=a.color||'#111';
+  e.style.fontWeight=a.bold?700:400;
+  e.style.fontStyle=a.italic?'italic':'normal';
+  e.style.textDecoration=((a.underline?'underline ':''+(a.strike?'line-through':'')).trim()||'none');
+  e.style.textAlign=a.align||'left';
+  e.style.fontFamily=fontFamily(a.font);
+  if(a.rotate) e.style.transform=`rotate(${a.rotate}deg)`; else e.style.transform='';
+  if(e.contentEditable!=='true') e.textContent=a.text||'';
+  e.classList.toggle('mincho',a.font==='mincho');
 }
 
 function makeAnnEl(p,a){
   const s=App.scale;
   let e;
   if(a.type==='text'){
-    e=el('div','ann text'+(a.font==='mincho'?' mincho':''));
-    e.textContent=a.text||'';
-    e.style.cssText=`left:${a.x*s}px;top:${a.y*s}px;font-size:${a.size*s}px;color:${a.color};font-weight:${a.bold?700:400};max-width:${(p.wpt-a.x)*s}px`;
+    e=el('div','ann text');
+    applyTextStyle(e,a,s);
   } else if(a.type==='highlight'){
     e=el('div','ann highlight');
     e.style.cssText=annStyle(a)+`;background:${hexToRgba(a.color,.42)}`;
@@ -558,34 +619,266 @@ function makeAnnEl(p,a){
     const pin=el('div','pin'); pin.textContent='💬'; e.appendChild(pin); e.title=a.text||'';
   }
   e.dataset.id=a.id; a._el=e;
-  if(App.selected && App.selected.id===a.id){ e.classList.add('selected'); addHandle(e,a,p); }
   p.layer.appendChild(e);
   return e;
 }
-function hexToRgba(h,al){ const [r,g,b]=hexToRgb01(h); return `rgba(${r*255|0},${g*255|0},${b*255|0},${al})`; }
 
-function addHandle(e,a,p){
-  if(['text','comment'].includes(a.type)) return; // these resize via font/size only
-  const h=el('div','handle');
-  h.addEventListener('pointerdown',ev=>{
-    ev.stopPropagation(); ev.preventDefault();
-    const s=App.scale; const startX=ev.clientX, startY=ev.clientY, w0=a.w, h0=a.h;
-    const move=m=>{ a.w=Math.max(6,w0+(m.clientX-startX)/s); a.h=Math.max(6,h0+(m.clientY-startY)/s); applyAnnStyle(a); };
-    const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); pushHistory(); };
-    document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
-  });
-  e.appendChild(h);
-}
 function applyAnnStyle(a){
   const s=App.scale, e=a._el; if(!e) return;
-  if(a.type==='text'){ e.style.left=a.x*s+'px'; e.style.top=a.y*s+'px'; e.style.fontSize=a.size*s+'px'; e.style.color=a.color; e.style.fontWeight=a.bold?700:400; e.textContent=a.text; e.classList.toggle('mincho',a.font==='mincho'); }
-  else if(a.type==='comment'){ e.style.left=a.x*s+'px'; e.style.top=a.y*s+'px'; e.title=a.text||''; }
+  if(a.type==='text'){ applyTextStyle(e,a,s); refreshSelBox(); }
+  else if(a.type==='comment'){ e.style.left=a.x*s+'px'; e.style.top=a.y*s+'px'; e.title=a.text||''; refreshSelBox(); }
   else { e.style.left=a.x*s+'px'; e.style.top=a.y*s+'px'; e.style.width=a.w*s+'px'; e.style.height=a.h*s+'px';
     if(a.type==='highlight') e.style.background=hexToRgba(a.color,.42);
     if(a.type==='underline'){ const u=e.querySelector('.ul'); if(u)u.style.background=a.color; }
     if(a.type==='link') e.title=a.url||'';
+    refreshSelBox();
   }
 }
+
+/* ============================================================
+   Selection box overlay with 8 round handles + rotate handle
+   ============================================================ */
+let _selBox=null, _selPage=null;
+
+function clearSelBox(){
+  if(_selBox){ _selBox.remove(); _selBox=null; }
+  _selPage=null;
+  hideFmtBar();
+}
+
+function refreshSelBox(){
+  if(!App.selected || !_selPage) return;
+  positionSelBox(App.selected, _selPage);
+}
+
+function positionSelBox(a,p){
+  if(_selBox){ _selBox.remove(); _selBox=null; }
+  const e=a._el; if(!e) return;
+  const layer=p.layer;
+  const r=e.getBoundingClientRect();
+  const lr=layer.getBoundingClientRect();
+  const x=r.left-lr.left, y=r.top-lr.top, w=r.width, h=r.height;
+
+  const box=el('div','sel-box');
+  box.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+
+  const POS={nw:[0,0],n:[50,0],ne:[100,0],w:[0,50],e:[100,50],sw:[0,100],s:[50,100],se:[100,100]};
+  for(const [hk,[px,py]] of Object.entries(POS)){
+    const hEl=el('div','sel-handle'); hEl.dataset.h=hk;
+    hEl.style.left=px+'%'; hEl.style.top=py+'%';
+    hEl.addEventListener('pointerdown',ev=>startHandleDrag(ev,hk,a,p,w,h));
+    box.appendChild(hEl);
+  }
+
+  // rotate handle
+  const rot=el('div','sel-rotate'); rot.textContent='↻';
+  rot.style.cssText='left:50%;top:-28px';
+  const cx=lr.left+x+w/2, cy=lr.top+y+h/2;
+  rot.addEventListener('pointerdown',ev=>startRotateDrag(ev,a,p,cx,cy));
+  box.appendChild(rot);
+
+  layer.appendChild(box);
+  _selBox=box; _selPage=p;
+}
+
+function startHandleDrag(ev,hk,a,p,bw,bh){
+  ev.stopPropagation(); ev.preventDefault();
+  const s=App.scale;
+  const sx=ev.clientX, sy=ev.clientY;
+  const x0=a.x, y0=a.y, w0=a.w||bw/s, h0=a.h||bh/s, sz0=a.size||16;
+  const move=m=>{
+    const dx=(m.clientX-sx)/s, dy=(m.clientY-sy)/s;
+    if(hk.includes('e'))  a.w=Math.max(10,w0+dx);
+    if(hk.includes('s'))  a.h=Math.max(6, h0+dy);
+    if(hk.includes('w')){ a.x=x0+dx; a.w=Math.max(10,w0-dx); }
+    if(hk.includes('n')){ a.y=y0+dy; a.h=Math.max(6, h0-dy); }
+    if(a.type==='text'){
+      if(hk==='s'||hk==='se'||hk==='sw')  a.size=Math.max(6, sz0*(1+dy/bh));
+      if(hk==='n'||hk==='ne'||hk==='nw')  a.size=Math.max(6, sz0*(1-dy/bh));
+      if(hk==='e'||hk==='w') a.size=Math.max(6, sz0*(1+(hk==='e'?dx:-dx)/(bw)));
+    }
+    applyAnnStyle(a); positionSelBox(a,p);
+    if(a.type==='text') syncFmtBar(a);
+  };
+  const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); pushHistory(); };
+  document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+}
+
+function startRotateDrag(ev,a,p,cx,cy){
+  ev.stopPropagation(); ev.preventDefault();
+  const startAngle=Math.atan2(ev.clientY-cy,ev.clientX-cx);
+  const startRot=a.rotate||0;
+  const move=m=>{
+    const ang=Math.atan2(m.clientY-cy,m.clientX-cx);
+    a.rotate=Math.round(startRot+(ang-startAngle)*180/Math.PI);
+    applyAnnStyle(a); positionSelBox(a,p);
+  };
+  const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); pushHistory(); };
+  document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+}
+
+/* ============================================================
+   Floating format bar (font / size / bold / italic / ul / strike / align / color)
+   ============================================================ */
+let _fmtBar=null, _fmtAnn=null;
+const FONT_SIZES=[8,9,10,11,12,14,16,18,20,22,24,28,32,36,48,60,72];
+
+function buildFmtBar(){
+  if(_fmtBar) return;
+  const bar=el('div','fmt-bar');
+  bar.id='fmt-bar';
+  bar.innerHTML=`
+    <span class="drag-handle" title="ドラッグで移動">⠿</span>
+    <select id="fb-font" title="書体">
+      <option value="gothic">ゴシック</option>
+      <option value="mincho">明朝</option>
+    </select>
+    <div class="sep"></div>
+    <input id="fb-size" type="number" min="6" max="200" step="1" value="16" title="文字サイズ（pt）">
+    <div class="sep"></div>
+    <button id="fb-bold" title="太字 Ctrl+B"><b>B</b></button>
+    <button id="fb-italic" title="斜体 Ctrl+I"><i>I</i></button>
+    <button id="fb-ul" title="下線 Ctrl+U" style="text-decoration:underline">U</button>
+    <button id="fb-strike" title="取り消し線"><s>S</s></button>
+    <div class="sep"></div>
+    <button id="fb-al" title="左揃え">⬅</button>
+    <button id="fb-ac" title="中央">⬌</button>
+    <button id="fb-ar" title="右揃え">➡</button>
+    <div class="sep"></div>
+    <input id="fb-color" type="color" title="文字色">
+    <div class="sep"></div>
+    <button id="fb-ok" title="確定 Enter" style="color:#7df">✓</button>`;
+  document.body.appendChild(bar);
+  _fmtBar=bar;
+  makeDraggable(bar, bar.querySelector('.drag-handle'));
+
+  bar.querySelector('#fb-font').onchange=()=>fmtCmd('font',bar.querySelector('#fb-font').value);
+  bar.querySelector('#fb-size').oninput =()=>fmtCmd('size',+bar.querySelector('#fb-size').value||16);
+  bar.querySelector('#fb-bold').onclick  =()=>fmtCmd('bold');
+  bar.querySelector('#fb-italic').onclick=()=>fmtCmd('italic');
+  bar.querySelector('#fb-ul').onclick    =()=>fmtCmd('underline');
+  bar.querySelector('#fb-strike').onclick=()=>fmtCmd('strike');
+  bar.querySelector('#fb-al').onclick    =()=>fmtCmd('align','left');
+  bar.querySelector('#fb-ac').onclick    =()=>fmtCmd('align','center');
+  bar.querySelector('#fb-ar').onclick    =()=>fmtCmd('align','right');
+  bar.querySelector('#fb-color').oninput =()=>fmtCmd('color',bar.querySelector('#fb-color').value);
+  bar.querySelector('#fb-ok').onclick    =()=>commitEditing();
+}
+
+function fmtCmd(cmd,val){
+  const a=_fmtAnn; if(!a) return;
+  if(cmd==='font')     a.font=val;
+  if(cmd==='size')     a.size=Math.max(6,val);
+  if(cmd==='bold')     a.bold=!a.bold;
+  if(cmd==='italic')   a.italic=!a.italic;
+  if(cmd==='underline')a.underline=!a.underline;
+  if(cmd==='strike')   a.strike=!a.strike;
+  if(cmd==='align')    a.align=val;
+  if(cmd==='color')    a.color=val;
+  applyAnnStyle(a);
+  syncFmtBar(a);
+  if(a._el && a._el.contentEditable==='true') a._el.focus();
+}
+
+function syncFmtBar(a){
+  if(!_fmtBar||!a) return;
+  _fmtBar.querySelector('#fb-font').value=a.font||'gothic';
+  _fmtBar.querySelector('#fb-size').value=Math.round(a.size||16);
+  _fmtBar.querySelector('#fb-bold').classList.toggle('on',!!a.bold);
+  _fmtBar.querySelector('#fb-italic').classList.toggle('on',!!a.italic);
+  _fmtBar.querySelector('#fb-ul').classList.toggle('on',!!a.underline);
+  _fmtBar.querySelector('#fb-strike').classList.toggle('on',!!a.strike);
+  ['left','center','right'].forEach(d=>_fmtBar.querySelector('#fb-a'+d[0]).classList.toggle('on',(a.align||'left')===d));
+  try{ _fmtBar.querySelector('#fb-color').value=a.color||'#111111'; }catch(_){}
+}
+
+function showFmtBar(a, anchorEl){
+  buildFmtBar();
+  _fmtAnn=a;
+  syncFmtBar(a);
+  _fmtBar.style.display='flex';
+  if(anchorEl){
+    const r=anchorEl.getBoundingClientRect();
+    const bw=_fmtBar.offsetWidth||420, bh=_fmtBar.offsetHeight||42;
+    let fx=r.left, fy=r.top-bh-12;
+    if(fy<8) fy=r.bottom+8;
+    if(fx+bw>window.innerWidth-8) fx=Math.max(8,window.innerWidth-bw-8);
+    _fmtBar.style.left=fx+'px'; _fmtBar.style.top=fy+'px';
+  }
+}
+
+function hideFmtBar(){
+  if(_fmtBar){ _fmtBar.style.display='none'; }
+  _fmtAnn=null;
+}
+
+function makeDraggable(dragEl,handle){
+  let ox=0,oy=0;
+  handle.addEventListener('pointerdown',ev=>{
+    ox=ev.clientX-dragEl.offsetLeft; oy=ev.clientY-dragEl.offsetTop;
+    const mv=m=>{ dragEl.style.left=(m.clientX-ox)+'px'; dragEl.style.top=(m.clientY-oy)+'px'; };
+    const up=()=>{ document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); };
+    document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
+    ev.preventDefault();
+  });
+}
+
+/* ============================================================
+   WYSIWYG in-place text editing (contentEditable)
+   ============================================================ */
+let _editingAnn=null, _editingPage=null, _ceCb=null, _ceInput=null;
+
+function beginEditing(a,p){
+  if(_editingAnn && _editingAnn!==a) commitEditing();
+  _editingAnn=a; _editingPage=p;
+  const e=a._el;
+  e.classList.add('editing');
+  e.contentEditable='true';
+  e.style.cursor='text';
+  e.focus();
+  const range=document.createRange(), sel=window.getSelection();
+  range.selectNodeContents(e); range.collapse(false);
+  sel.removeAllRanges(); sel.addRange(range);
+  showFmtBar(a,e);
+  e.addEventListener('keydown', _ceCb=ev=>{
+    if(ev.ctrlKey||ev.metaKey){
+      if(ev.key==='b'){ ev.preventDefault(); fmtCmd('bold'); }
+      if(ev.key==='i'){ ev.preventDefault(); fmtCmd('italic'); }
+      if(ev.key==='u'){ ev.preventDefault(); fmtCmd('underline'); }
+      if(ev.key==='Enter'&&!ev.shiftKey){ ev.preventDefault(); commitEditing(); }
+      if(ev.key==='z'){ ev.preventDefault(); ev.shiftKey?redo():undo(); }
+    }
+    if(ev.key==='Escape') commitEditing();
+  });
+  e.addEventListener('input', _ceInput=()=>{
+    a.text=e.innerText;
+    positionSelBox(a,p);
+    syncFmtBar(a);
+  });
+}
+
+function commitEditing(){
+  const a=_editingAnn, p=_editingPage; if(!a) return;
+  const e=a._el;
+  e.contentEditable='false';
+  e.style.cursor='move';
+  e.classList.remove('editing');
+  if(_ceCb){ e.removeEventListener('keydown',_ceCb); _ceCb=null; }
+  if(_ceInput){ e.removeEventListener('input',_ceInput); _ceInput=null; }
+  a.text=e.innerText||'';
+  // clean up: remove empty annotation
+  if(!a.text.trim()){
+    removeAnn(a,p);
+  } else {
+    // keep a.text synced but restore clean textContent
+    e.textContent=a.text;
+    applyTextStyle(e,a,App.scale);
+    pushHistory();
+  }
+  _editingAnn=null; _editingPage=null;
+  hideFmtBar();
+}
+
 
 /* ============================================================
    Tools / interaction
@@ -608,6 +901,20 @@ function setTool(t){
 function attachLayerEvents(p){
   const layer=p.layer;
   layer.addEventListener('pointerdown',ev=>onLayerDown(ev,p));
+  // double-click = enter edit mode on text annotation OR existing run
+  layer.addEventListener('dblclick',ev=>{
+    // existing added text annotation
+    const hit=ev.target.closest('.ann[data-id]');
+    if(hit){
+      const a=p.annos.find(x=>x.id===hit.dataset.id);
+      if(a && a.type==='text'){ ev.preventDefault(); select(a,p); beginEditing(a,p); return; }
+    }
+    // original PDF text run (edit-mode cursor tool active)
+    if(App.tool==='edit'){
+      const rb=ev.target.closest('.runbox');
+      if(rb){ ev.preventDefault(); openRunEditor(rb,p); return; }
+    }
+  });
 }
 
 function layerPoint(ev,p){
@@ -616,34 +923,54 @@ function layerPoint(ev,p){
 }
 
 function onLayerDown(ev,p){
-  const t=App.tool;
-  // clicking an existing annotation
-  const hit=ev.target.closest('.ann');
+  // ignore clicks inside sel-box handles / fmt-bar
+  if(ev.target.closest('.sel-handle,.sel-rotate,.fmt-bar')) return;
+  // ignore if we're inside a contenteditable
+  if(ev.target.closest('[contenteditable=true]')) return;
 
-  if(t==='select'){
-    if(hit){ const a=p.annos.find(x=>x.id===hit.dataset.id); if(a){ select(a,p); startMove(ev,a,p); return; } }
-    select(null); return;
-  }
-  if(t==='edit'){
-    const rb=ev.target.closest('.runbox');
-    if(rb){ openRunEditor(rb,p); }
+  const t=App.tool;
+  const hit=ev.target.closest('.ann[data-id]');
+
+  if(t==='select' || t==='edit'){
+    if(hit){
+      const a=p.annos.find(x=>x.id===hit.dataset.id);
+      if(a){
+        // already selected = start move; otherwise select
+        if(App.selected===a){ startMove(ev,a,p); }
+        else { select(a,p); startMove(ev,a,p); }
+        return;
+      }
+    }
+    // edit mode: click runbox to open existing-text editor
+    if(t==='edit'){
+      const rb=ev.target.closest('.runbox');
+      if(rb){ openRunEditor(rb,p); return; }
+    }
+    // click on empty canvas = deselect
+    if(!hit){ commitEditing(); select(null); }
     return;
   }
+
   if(t==='text'){
+    commitEditing();
     const pt=layerPoint(ev,p);
-    const a={id:'a'+App.uid++,type:'text',x:pt.x,y:pt.y,text:'',color:'#111111',size:16,bold:false,font:'gothic'};
-    p.annos.push(a); makeAnnEl(p,a); select(a,p);
-    openTextEditor(a,p,true);
+    const a={id:'a'+App.uid++,type:'text',x:pt.x,y:pt.y,text:'',color:'#111111',size:16,bold:false,font:'gothic',align:'left',lineH:1.3};
+    p.annos.push(a); makeAnnEl(p,a);
+    select(a,p);
+    beginEditing(a,p);
     return;
   }
+
   if(t==='comment'){
     const pt=layerPoint(ev,p);
     const a={id:'a'+App.uid++,type:'comment',x:pt.x-2,y:pt.y-2,text:''};
     p.annos.push(a); makeAnnEl(p,a); select(a,p);
-    const txt=prompt('コメントを入力'); if(txt!==null){ a.text=txt; applyAnnStyle(a); pushHistory(); openProps(a,p);} else { removeAnn(a,p);} 
+    const txt=prompt('コメントを入力');
+    if(txt!==null){ a.text=txt; applyAnnStyle(a); pushHistory(); openProps(a,p); }
+    else removeAnn(a,p);
     return;
   }
-  // drag-rect tools: highlight / underline / image / link
+
   if(['highlight','underline','image','link'].includes(t)){
     startRect(ev,p,t);
   }
@@ -654,8 +981,16 @@ function startMove(ev,a,p){
   ev.preventDefault();
   const s=App.scale, sx=ev.clientX, sy=ev.clientY, x0=a.x, y0=a.y;
   let moved=false;
-  const move=m=>{ moved=true; a.x=x0+(m.clientX-sx)/s; a.y=y0+(m.clientY-sy)/s; applyAnnStyle(a); };
-  const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); if(moved)pushHistory(); };
+  const move=m=>{
+    moved=true;
+    a.x=x0+(m.clientX-sx)/s; a.y=y0+(m.clientY-sy)/s;
+    applyAnnStyle(a);
+    positionSelBox(a,p);
+  };
+  const up=()=>{
+    document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up);
+    if(moved) pushHistory();
+  };
   document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
 }
 
@@ -713,164 +1048,191 @@ $('#file-img').onchange=e=>{
   rd.readAsDataURL(f);
 };
 
-/* ---------- inline text editor (for add-text) ---------- */
-function openTextEditor(a,p,isNew){
-  const s=App.scale;
-  const ta=el('textarea','inline-input');
-  ta.value=a.text||'';
-  ta.style.cssText=`left:${a.x*s}px;top:${a.y*s}px;font-size:${a.size*s}px;color:${a.color};font-weight:${a.bold?700:400};min-width:${Math.max(80,(a.w||60))}px;font-family:${a.font==='mincho'?"'Noto Serif JP',serif":"'Noto Sans JP',sans-serif"}`;
-  p.layer.appendChild(ta);
-  // floating toolbar
-  const tb=el('div','inline-toolbar');
-  tb.innerHTML=`
-    <button data-act="bold" title="太字"><b>B</b></button>
-    <select data-act="size" title="文字サイズ">
-      <option value="12">S</option><option value="16" selected>M</option><option value="22">L</option><option value="30">XL</option>
-    </select>
-    <div class="div"></div>
-    <input type="color" data-act="color" value="${a.color}" title="文字色">
-    <div class="div"></div>
-    <button data-act="ok" title="確定">✓</button>`;
-  tb.style.cssText=`left:${a.x*s}px;top:${(a.y*s)-40}px`;
-  p.layer.appendChild(tb);
-  if(a.size) tb.querySelector('[data-act=size]').value=String(a.size);
-
-  const sync=()=>{ ta.style.fontSize=a.size*s+'px'; ta.style.color=a.color; ta.style.fontWeight=a.bold?700:400; };
-  tb.querySelector('[data-act=bold]').onclick=ev=>{ev.preventDefault(); a.bold=!a.bold; ev.currentTarget.classList.toggle('on',a.bold); sync(); ta.focus();};
-  tb.querySelector('[data-act=size]').onchange=ev=>{ a.size=+ev.target.value; sync(); ta.focus(); };
-  tb.querySelector('[data-act=color]').oninput=ev=>{ a.color=ev.target.value; sync(); };
-  if(a.bold) tb.querySelector('[data-act=bold]').classList.add('on');
-
-  const finish=()=>{
-    a.text=ta.value;
-    ta.remove(); tb.remove();
-    if(!a.text.trim()){ removeAnn(a,p); return; }
-    applyAnnStyle(a); pushHistory(); openProps(a,p);
-  };
-  tb.querySelector('[data-act=ok]').onclick=ev=>{ev.preventDefault(); finish();};
-  ta.addEventListener('blur',()=>setTimeout(()=>{ if(document.activeElement!==ta && !tb.contains(document.activeElement)) finish(); },120));
-  ta.addEventListener('keydown',ev=>{ if(ev.key==='Escape'){ if(isNew && !ta.value.trim()) removeAnn(a,p); else finish(); } });
-  setTimeout(()=>ta.focus(),0);
+/* ============================================================
+   Selection
+   ============================================================ */
+function select(a,p){
+  // commit any active edit first
+  if(_editingAnn && _editingAnn!==a) commitEditing();
+  App.selected=a; App.selectedPage=p;
+  clearSelBox();
+  if(a){
+    positionSelBox(a,p);
+    if(a.type==='text') showFmtBar(a,a._el);
+    openProps(a,p);
+  } else {
+    closeProps();
+  }
 }
 
-/* ---------- edit existing text (run) ---------- */
+function removeAnn(a,p){
+  if(_editingAnn===a) commitEditing();
+  const i=p.annos.indexOf(a); if(i>=0)p.annos.splice(i,1);
+  if(a._el) a._el.remove();
+  if(App.selected===a){ App.selected=null; App.selectedPage=null; clearSelBox(); closeProps(); }
+  pushHistory();
+}
+
+/* ---------- existing text run: click to edit in-place ---------- */
 function openRunEditor(rb,p){
   const left=parseFloat(rb.style.left), top=parseFloat(rb.style.top),
         w=parseFloat(rb.style.width), h=parseFloat(rb.style.height);
   const sizePt=parseFloat(rb.dataset.size)||(h/App.scale/1.15);
   const fontKind=rb.dataset.font||'gothic';
   const orig=rb.dataset.str;
-  const ta=el('textarea','inline-input');
-  ta.value=orig;
-  ta.style.cssText=`left:${left}px;top:${top}px;width:${Math.max(w,60)}px;font-size:${sizePt*App.scale}px;color:#111;font-family:${fontKind==='mincho'?"'Noto Serif JP',serif":"'Noto Sans JP',sans-serif"}`;
-  p.layer.appendChild(ta);
-  const finish=()=>{
-    const v=ta.value; ta.remove();
-    if(v===orig) return; // no change
-    const s=App.scale;
-    // whiteout original area
-    const wo={id:'a'+App.uid++,type:'whiteout',x:left/s,y:top/s,w:w/s,h:h/s};
-    p.annos.push(wo); makeAnnEl(p,wo);
-    if(v.trim()){
-      // a.y = box top (points) so the new baseline aligns with the original line
-      const a={id:'a'+App.uid++,type:'text',x:left/s,y:top/s,text:v,color:'#111111',size:sizePt,bold:false,font:fontKind};
-      p.annos.push(a); makeAnnEl(p,a); select(a,p); openProps(a,p);
-    }
-    pushHistory();
-  };
-  ta.addEventListener('blur',finish);
-  ta.addEventListener('keydown',ev=>{ if(ev.key==='Escape'){ ta.value=orig; ta.blur(); } if(ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); ta.blur(); } });
-  setTimeout(()=>{ta.focus(); ta.select();},0);
+  const s=App.scale;
+  // whiteout original area, create editable text annotation
+  const wo={id:'a'+App.uid++,type:'whiteout',x:left/s,y:top/s,w:w/s,h:h/s};
+  p.annos.push(wo); makeAnnEl(p,wo);
+  const a={id:'a'+App.uid++,type:'text',x:left/s,y:top/s,text:orig,color:'#111111',
+    size:sizePt,bold:false,font:fontKind};
+  p.annos.push(a); makeAnnEl(p,a);
+  select(a,p);
+  beginEditing(a,p);
+  // if user escapes without change, remove new element & restore
+  const origCommit=commitEditing;
+}
+
+/* ---------- new text: click to place, immediately edit ---------- */
+function openTextEditor(a,p,isNew){
+  select(a,p);
+  beginEditing(a,p);
 }
 
 /* ============================================================
-   Selection + properties panel
+   Properties panel
    ============================================================ */
-function select(a,p){
-  if(App.selected && App.selected._el){ App.selected._el.classList.remove('selected'); const h=App.selected._el.querySelector('.handle'); if(h)h.remove(); }
-  App.selected=a;
-  if(a){ a._el.classList.add('selected'); addHandle(a._el,a,p); openProps(a,p); }
-  else closeProps();
-}
-function removeAnn(a,p){
-  const i=p.annos.indexOf(a); if(i>=0)p.annos.splice(i,1);
-  if(a._el)a._el.remove();
-  if(App.selected===a){ App.selected=null; closeProps(); }
-  pushHistory();
-}
-
 function closeProps(){
   $('#props-body').innerHTML='<div class="empty-hint">要素を選択するとここで編集できます。<br><br>左のツールから操作を選んでください。</div>';
   if(window.matchMedia('(max-width:760px)').matches) $('#props').classList.remove('open');
 }
+
 const PALETTE=['#111111','#e8552d','#1f9d6b','#3a6df0','#9b59b6','#f1c40f','#ffffff'];
 
 function openProps(a,p){
   if(window.matchMedia('(max-width:760px)').matches){ $('#props').classList.add('open'); $('#props-close').style.display=''; }
   const b=$('#props-body'); b.innerHTML='';
   const title={text:'テキスト',highlight:'マーカー',underline:'下線',image:'画像',link:'リンク',comment:'コメント',whiteout:'塗りつぶし'}[a.type]||a.type;
-  const head=el('div'); head.style.cssText='font-weight:700;margin-bottom:14px'; head.textContent=title; b.appendChild(head);
+  const head=el('div'); head.style.cssText='font-weight:700;font-size:13px;margin-bottom:12px;color:var(--ink)'; head.textContent=title; b.appendChild(head);
 
   if(a.type==='text'){
-    addTextField(b,'テキスト',a.text,v=>{a.text=v;applyAnnStyle(a);},true);
-    addSizeSeg(b,a);
-    addFontSeg(b,a);
-    addColor(b,'文字色',a.color,v=>{a.color=v;applyAnnStyle(a);});
-    addBold(b,a);
+    // font family
+    addField(b,'書体',()=>{
+      const seg=el('div','seg');
+      [['gothic','ゴシック'],['mincho','明朝']].forEach(([v,l])=>{
+        const btn=el('button'); btn.textContent=l; btn.style.fontFamily=fontFamily(v);
+        if((a.font||'gothic')===v) btn.classList.add('on');
+        btn.onclick=()=>{ a.font=v; applyAnnStyle(a); syncFmtBar(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // size
+    addField(b,'文字サイズ（pt）',()=>{
+      const row=el('div'); row.style.cssText='display:flex;gap:8px;align-items:center';
+      const inp=el('input'); inp.type='number'; inp.min=6; inp.max=200; inp.value=Math.round(a.size||16);
+      inp.style.cssText='width:70px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px';
+      inp.oninput=()=>{ a.size=Math.max(6,+inp.value||16); applyAnnStyle(a); syncFmtBar(a); };
+      row.appendChild(inp);
+      const seg=el('div','seg');
+      ({S:12,M:16,L:22,XL:30}).entries||Object.entries({S:12,M:16,L:22,XL:30});
+      [['S',12],['M',16],['L',22],['XL',30]].forEach(([k,v])=>{
+        const btn=el('button'); btn.textContent=k;
+        btn.onclick=()=>{ a.size=v; inp.value=v; applyAnnStyle(a); syncFmtBar(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        if(a.size===v) btn.classList.add('on');
+        seg.appendChild(btn);
+      });
+      row.appendChild(seg); return row;
+    });
+    // style buttons
+    addField(b,'スタイル',()=>{
+      const seg=el('div','seg');
+      const defs=[['B','bold'],['I','italic'],['U','underline'],['S','strike']];
+      defs.forEach(([l,k])=>{
+        const btn=el('button'); btn.innerHTML=`<${l==='S'?'s':l==='U'?'u':l==='I'?'i':'b'}>${l}</${l==='S'?'s':l==='U'?'u':l==='I'?'i':'b'}>`;
+        if(a[k]) btn.classList.add('on');
+        btn.onclick=()=>{ a[k]=!a[k]; btn.classList.toggle('on',a[k]); applyAnnStyle(a); syncFmtBar(a); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // text align
+    addField(b,'揃え',()=>{
+      const seg=el('div','seg');
+      [['left','←左'],['center','中央'],['right','右→']].forEach(([v,l])=>{
+        const btn=el('button'); btn.textContent=l;
+        if((a.align||'left')===v) btn.classList.add('on');
+        btn.onclick=()=>{ a.align=v; applyAnnStyle(a); syncFmtBar(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // color
+    addColorField(b,'文字色',a.color,v=>{ a.color=v; applyAnnStyle(a); syncFmtBar(a); });
+    // line height
+    addField(b,'行間',()=>{
+      const seg=el('div','seg');
+      [[1.0,'狭'],[1.3,'標準'],[1.6,'広'],[2.0,'2行']].forEach(([v,l])=>{
+        const btn=el('button'); btn.textContent=l;
+        if(Math.abs((a.lineH||1.3)-v)<0.01) btn.classList.add('on');
+        btn.onclick=()=>{ a.lineH=v; applyAnnStyle(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // double click hint
+    const hint=el('div','empty-hint'); hint.innerHTML='ダブルクリックでその場編集<br>上部ツールバーでフォント・色を変更';
+    hint.style.marginTop='10px'; b.appendChild(hint);
+
   } else if(a.type==='highlight'){
-    addColor(b,'色',a.color,v=>{a.color=v;applyAnnStyle(a);});
+    addColorField(b,'色',a.color,v=>{ a.color=v; applyAnnStyle(a); });
   } else if(a.type==='underline'){
-    addColor(b,'色',a.color,v=>{a.color=v;applyAnnStyle(a);});
+    addColorField(b,'色',a.color,v=>{ a.color=v; applyAnnStyle(a); });
   } else if(a.type==='link'){
-    addTextField(b,'リンク先 URL',a.url,v=>{a.url=v;applyAnnStyle(a);});
+    addTextField(b,'リンク先 URL',a.url,v=>{ a.url=v; applyAnnStyle(a); });
   } else if(a.type==='comment'){
-    addTextField(b,'コメント',a.text,v=>{a.text=v;applyAnnStyle(a);},true);
+    addTextAreaField(b,'コメント',a.text,v=>{ a.text=v; applyAnnStyle(a); });
   } else if(a.type==='image'){
-    const note=el('div','empty-hint'); note.textContent='角のハンドルでサイズ変更、ドラッグで移動できます。'; b.appendChild(note);
+    const note=el('div','empty-hint'); note.textContent='ハンドル（●）でサイズ変更・回転、ドラッグで移動'; b.appendChild(note);
   }
-  const del=el('button','danger'); del.textContent='この要素を削除'; del.style.marginTop='10px';
+
+  const del=el('button','danger'); del.textContent='削除'; del.style.marginTop='14px';
   del.onclick=()=>removeAnn(a,p); b.appendChild(del);
 }
-function addTextField(b,label,val,on,multi){
+
+function addField(b,label,buildFn){
   const f=el('div','field'); f.innerHTML=`<label>${label}</label>`;
-  const inp = multi?el('textarea'):el('input'); if(!multi)inp.type='text'; inp.value=val||'';
-  inp.oninput=()=>on(inp.value); f.appendChild(inp); b.appendChild(f);
+  f.appendChild(buildFn()); b.appendChild(f);
 }
-function addColor(b,label,val,on){
-  const f=el('div','field'); f.innerHTML=`<label>${label}</label>`;
-  const sw=el('div','swatches');
-  PALETTE.forEach(c=>{ const s=el('div','sw'); s.style.background=c; if(c==='#ffffff')s.style.boxShadow='0 0 0 1px var(--line)'; if(c.toLowerCase()===(val||'').toLowerCase())s.classList.add('on');
-    s.onclick=()=>{ on(c); [...sw.children].forEach(x=>x.classList.remove('on')); s.classList.add('on'); cp.value=c; }; sw.appendChild(s); });
-  f.appendChild(sw);
-  const cp=el('input'); cp.type='color'; cp.value=val&&val!=='transparent'?val:'#111111'; cp.style.cssText='margin-top:8px;width:100%;height:30px;border:1px solid var(--line);border-radius:8px;background:#fff';
-  cp.oninput=()=>{ on(cp.value); [...sw.children].forEach(x=>x.classList.remove('on')); };
-  f.appendChild(cp); b.appendChild(f);
+function addTextField(b,label,val,on){
+  addField(b,label,()=>{
+    const inp=el('input'); inp.type='text'; inp.value=val||'';
+    inp.oninput=()=>on(inp.value); return inp;
+  });
 }
-function addFontSeg(b,a){
-  const f=el('div','field'); f.innerHTML='<label>書体</label>';
-  const seg=el('div','seg');
-  const g=el('button'); g.textContent='ゴシック'; g.style.fontFamily="'Noto Sans JP',sans-serif";
-  const m=el('button'); m.textContent='明朝'; m.style.fontFamily="'Noto Serif JP',serif";
-  (a.font==='mincho'?m:g).classList.add('on');
-  g.onclick=()=>{a.font='gothic';applyAnnStyle(a);g.classList.add('on');m.classList.remove('on');};
-  m.onclick=()=>{a.font='mincho';applyAnnStyle(a);m.classList.add('on');g.classList.remove('on');};
-  seg.appendChild(g); seg.appendChild(m); f.appendChild(seg); b.appendChild(f);
+function addTextAreaField(b,label,val,on){
+  addField(b,label,()=>{
+    const ta=el('textarea'); ta.value=val||''; ta.style.resize='vertical'; ta.style.minHeight='60px';
+    ta.oninput=()=>on(ta.value); return ta;
+  });
 }
-function addSizeSeg(b,a){
-  const f=el('div','field'); f.innerHTML='<label>文字サイズ</label>';
-  const seg=el('div','seg'); const map={S:12,M:16,L:22,XL:30};
-  Object.entries(map).forEach(([k,v])=>{ const btn=el('button'); btn.textContent=k; if(a.size===v)btn.classList.add('on');
-    btn.onclick=()=>{ a.size=v; applyAnnStyle(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); }; seg.appendChild(btn); });
-  f.appendChild(seg); b.appendChild(f);
-}
-function addBold(b,a){
-  const f=el('div','field'); f.innerHTML='<label>スタイル</label>';
-  const seg=el('div','seg');
-  const nb=el('button'); nb.textContent='標準'; const bb=el('button'); bb.innerHTML='<b>太字</b>';
-  (a.bold?bb:nb).classList.add('on');
-  nb.onclick=()=>{a.bold=false;applyAnnStyle(a);nb.classList.add('on');bb.classList.remove('on');};
-  bb.onclick=()=>{a.bold=true;applyAnnStyle(a);bb.classList.add('on');nb.classList.remove('on');};
-  seg.appendChild(nb); seg.appendChild(bb); f.appendChild(seg); b.appendChild(f);
+function addColorField(b,label,val,on){
+  addField(b,label,()=>{
+    const wrap=el('div');
+    const sw=el('div','swatches');
+    PALETTE.forEach(c=>{
+      const s=el('div','sw'); s.style.background=c;
+      if(c==='#ffffff') s.style.boxShadow='0 0 0 1px var(--line)';
+      if(c.toLowerCase()===(val||'').toLowerCase()) s.classList.add('on');
+      s.onclick=()=>{ on(c); [...sw.children].forEach(x=>x.classList.remove('on')); s.classList.add('on'); cp.value=c; };
+      sw.appendChild(s);
+    });
+    wrap.appendChild(sw);
+    const cp=el('input'); cp.type='color'; cp.value=(val&&val!=='transparent')?val:'#111111';
+    cp.style.cssText='margin-top:8px;width:100%;height:30px;border:1px solid var(--line);border-radius:8px;background:#fff';
+    cp.oninput=()=>{ on(cp.value); [...sw.children].forEach(x=>x.classList.remove('on')); };
+    wrap.appendChild(cp); return wrap;
+  });
 }
 $('#props-close').onclick=()=>{ $('#props').classList.remove('open'); };
 
@@ -897,7 +1259,7 @@ function restore(json){
   const byIndex={}; App.pages.forEach(p=>byIndex[p.origIndex]=p);
   // rebuild order
   App.pages = snap.map(s=>{ const p=byIndex[s.i]; p.rotation=s.rot; p.deleted=s.del; p.annos=s.annos; return p; });
-  App.selected=null; closeProps();
+  App.selected=null; App.selectedPage=null; clearSelBox(); closeProps();
   renderAll();
 }
 function pushHistory(){
