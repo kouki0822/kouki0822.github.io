@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>多機能メモ ─ 小さいラボ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16263f;
+    --ink-soft:#3a4d6b;
+    --paper:#fbfaf4;
+    --grid:#d9e1ec;
+    --hl:#ffe94d;
+    --hl-soft:#fff7b0;
+    --line:#c3cdda;
+    --danger:#c0432e;
+    --mono:'Space Mono',monospace;
+    --jp:'Zen Kaku Gothic New',sans-serif;
+    --bottom-nav:56px;
+    --toolbar-h:52px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family:var(--jp);
+    color:var(--ink);
+    background-color:var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px,transparent 1px),
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:24px 24px;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+
+  /* ---------- layout ---------- */
+  .wrap{ display:flex; min-height:100vh; max-width:1200px; margin:0 auto; }
+  .sidebar{
+    width:300px; flex:0 0 300px;
+    border-right:2px solid var(--ink);
+    background:rgba(251,250,244,.95);
+    display:flex; flex-direction:column;
+    position:sticky; top:0; height:100vh; overflow:hidden;
+  }
+  .main{ flex:1 1 auto; display:flex; flex-direction:column; min-width:0; }
+
+  /* ---------- sidebar ---------- */
+  .brand{ padding:18px 18px 14px; border-bottom:2px dashed var(--line); }
+  .brand a.back{
+    font-family:var(--mono); font-size:11px; letter-spacing:.05em;
+    text-decoration:none; color:var(--ink-soft);
+  }
+  .brand a.back:hover{ color:var(--ink); }
+  .brand h1{ font-family:var(--mono); font-weight:700; font-size:19px; margin:8px 0 2px; }
+  .brand h1 .mark{ background:linear-gradient(transparent 55%,var(--hl) 55%); padding:0 2px; }
+  .brand .sub{ font-size:11px; color:var(--ink-soft); font-family:var(--mono); }
+
+  .newbtn{
+    margin:14px 18px 4px; padding:13px 14px;
+    font-family:var(--mono); font-weight:700; font-size:13px;
+    color:var(--ink); background:var(--hl);
+    border:2px solid var(--ink); border-radius:2px; cursor:pointer;
+    box-shadow:3px 3px 0 var(--ink); transition:transform .06s,box-shadow .06s;
+    min-height:48px;
+  }
+  .newbtn:hover{ transform:translate(1px,1px); box-shadow:2px 2px 0 var(--ink); }
+  .newbtn:active{ transform:translate(3px,3px); box-shadow:0 0 0 var(--ink); }
+
+  .list{ flex:1 1 auto; overflow-y:auto; padding:10px 14px 24px; -webkit-overflow-scrolling:touch; }
+  .list-empty{ font-size:12px; color:var(--ink-soft); text-align:center; margin-top:30px; line-height:1.7; font-family:var(--mono); }
+
+  .card{
+    border:1.5px solid var(--line); border-radius:2px; background:#fff;
+    padding:12px 14px; margin-bottom:9px; cursor:pointer; position:relative;
+    transition:border-color .1s;
+  }
+  .card:hover{ border-color:var(--ink-soft); }
+  .card.active{ border-color:var(--ink); box-shadow:3px 3px 0 var(--ink); }
+  .card .no{ font-family:var(--mono); font-size:10px; color:var(--ink-soft); letter-spacing:.05em; }
+  .card .ttl{ font-weight:700; font-size:14px; margin:3px 0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .ttl.untitled{ color:var(--ink-soft); font-weight:500; }
+  .card .preview{ font-size:11px; color:var(--ink-soft); line-height:1.5; max-height:2.9em; overflow:hidden; }
+  .card .date{ font-family:var(--mono); font-size:9px; color:var(--ink-soft); margin-top:5px; }
+  .card .del{
+    position:absolute; top:10px; right:10px;
+    width:28px; height:28px; line-height:26px; text-align:center;
+    border:1px solid var(--line); border-radius:2px;
+    background:#fff; color:var(--ink-soft); font-size:14px; cursor:pointer;
+    opacity:0; transition:opacity .1s;
+  }
+  .card:hover .del{ opacity:1; }
+  .card .del:hover{ border-color:var(--danger); color:var(--danger); }
+
+  /* ---------- editor header ---------- */
+  .editor-head{
+    padding:14px 20px 0;
+    border-bottom:2px solid var(--ink);
+    background:rgba(251,250,244,.95);
+    position:sticky; top:0; z-index:10;
+  }
+  #title{
+    width:100%; border:none; background:transparent; outline:none;
+    font-family:var(--jp); font-weight:700; font-size:22px; color:var(--ink);
+    padding:2px 0 10px;
+  }
+  /* iOSズーム防止: 全inputを16px以上に */
+  input, textarea, select{ font-size:16px !important; }
+  #title::placeholder{ color:var(--line); }
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex; align-items:center; gap:6px;
+    padding:8px 4px 10px;
+    overflow-x:auto; overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    flex-wrap:nowrap;
+  }
+  .toolbar::-webkit-scrollbar{ display:none; }
+
+  /* フォントサイズ選択 */
+  .size-group{
+    display:inline-flex;
+    border:1.5px solid var(--ink);
+    border-radius:2px; overflow:hidden;
+    flex-shrink:0;
+  }
+  .size-btn{
+    font-family:var(--mono); font-weight:700; background:#fff;
+    border:none; border-right:1px solid var(--ink);
+    cursor:pointer; color:var(--ink);
+    padding:0 10px; height:44px;
+    display:flex; align-items:center; justify-content:center;
+    white-space:nowrap; flex-shrink:0;
+    min-width:44px;
+    transition:background .08s;
+  }
+  .size-btn:last-child{ border-right:none; }
+  .size-btn:hover{ background:var(--hl-soft); }
+  .size-btn.active{ background:var(--hl); }
+  .size-btn .s-label{ font-size:10px; margin-left:3px; color:var(--ink-soft); }
+
+  .tool{
+    font-family:var(--mono); font-size:13px; font-weight:700;
+    min-width:44px; height:44px; padding:0 10px;
+    border:1.5px solid var(--ink); border-radius:2px; background:#fff;
+    color:var(--ink); cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:4px;
+    transition:background .08s; flex-shrink:0; white-space:nowrap;
+  }
+  .tool:hover{ background:var(--hl-soft); }
+  .tool:active{ background:var(--hl); }
+  .tool.pdf:hover{ background:var(--hl); }
+
+  .divider{ width:1px; height:28px; background:var(--line); margin:0 2px; flex-shrink:0; }
+
+  .swatch-group{ display:inline-flex; gap:5px; align-items:center; flex-shrink:0; }
+  .swatch{
+    width:32px; height:32px; border:1.5px solid var(--ink); border-radius:50%;
+    cursor:pointer; padding:0; flex-shrink:0;
+    min-width:32px; min-height:32px;
+  }
+  .swatch:hover{ transform:scale(1.12); }
+  .tool-label{
+    font-family:var(--mono); font-size:10px; color:var(--ink-soft);
+    white-space:nowrap; flex-shrink:0; letter-spacing:.03em;
+  }
+
+  /* ---------- content area ---------- */
+  .paper-area{ flex:1 1 auto; overflow-y:auto; padding:20px 20px 100px; -webkit-overflow-scrolling:touch; }
+  #content{
+    min-height:200px; outline:none;
+    font-size:16px; line-height:1.9; color:var(--ink);
+    max-width:760px;
+  }
+  #content:empty:before{ content:attr(data-ph); color:var(--line); pointer-events:none; }
+  #content img{ max-width:100%; height:auto; border-radius:3px; margin:6px 0; display:block; }
+
+  /* ---------- empty state ---------- */
+  .empty-state{
+    flex:1 1 auto; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    color:var(--ink-soft); text-align:center; padding:40px;
+  }
+  .empty-state .big{ font-family:var(--mono); font-size:15px; font-weight:700; margin-bottom:6px; }
+  .empty-state p{ font-size:13px; line-height:1.8; }
+
+  /* ---------- footer bar ---------- */
+
+  .savestate{ font-family:var(--mono); font-size:11px; color:var(--ink-soft); white-space:nowrap; flex-shrink:0; }
+
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:80px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:13px;
+    padding:11px 18px; border-radius:3px; opacity:0; pointer-events:none;
+    transition:opacity .2s,transform .2s; z-index:200; max-width:90%; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- mobile bottom nav ---------- */
+  .bottom-nav{
+    display:none;
+    position:fixed; bottom:0; left:0; right:0;
+    height:var(--bottom-nav);
+    background:var(--paper); border-top:2px solid var(--ink);
+    z-index:100;
+  }
+  .bnav-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:10px; font-weight:700; color:var(--ink-soft);
+    border:none; background:transparent; cursor:pointer; gap:3px; padding:0;
+    border-right:1px solid var(--line); min-height:56px;
+  }
+  .bnav-btn:last-child{ border-right:none; }
+  .bnav-btn .bnav-icon{ font-size:20px; line-height:1; }
+  .bnav-btn.active{ color:var(--ink); background:var(--hl-soft); }
+  .mobile-back{ display:none; }
+
+  /* ---------- responsive ---------- */
+  @media(max-width:760px){
+    .wrap{ flex-direction:column; min-height:100vh; }
+
+    .sidebar{
+      width:100%; flex:none; height:auto;
+      border-right:none; border-bottom:2px solid var(--ink);
+      position:static;
+    }
+    .list{ max-height:45vh; }
+    .bottom-nav{ display:flex; }
+    .toast{ bottom:calc(var(--bottom-nav) + 16px); }
+
+    /* モバイル: 一覧 ↔ 編集 を切り替える */
+    body.view-editor .sidebar{ display:none; }
+    body.view-list .main{ display:none; }
+
+    /* フッターの書き出しボタンを小さく */
+
+    /* ツールバーのラベルを短く */
+    .tool-label{ font-size:9px; }
+
+    /* コンテンツ下部にボトムナビ分の余白 */
+    .paper-area{ padding-bottom:calc(var(--bottom-nav) + 80px); }
+
+    .mobile-back{
+      display:inline-flex; align-items:center; gap:4px;
+      font-family:var(--mono); font-size:12px; font-weight:700;
+      color:var(--ink); background:none; border:none; cursor:pointer;
+      padding:4px 0 8px; min-height:36px;
+    }
+
+    /* iOS safe area */
+    .bottom-nav{ padding-bottom:env(safe-area-inset-bottom); height:calc(var(--bottom-nav) + env(safe-area-inset-bottom)); }
+  }
+
+  /* ---------- print / PDF書き出し ---------- */
+  @media print{
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    body{ background:#fff !important; }
+    .sidebar,.toolbar,.bottom-nav,.mobile-back,.toast,
+    .editor-head .toolbar{ display:none !important; }
+    .wrap,.main{ display:block !important; max-width:none; }
+    .editor-head{
+      border:none !important; padding:0 !important;
+      position:static !important; background:#fff !important;
+    }
+    /* タイトル */
+    #title{
+      font-size:24pt !important; font-weight:700 !important;
+      padding:0 0 10pt !important; margin:0 !important;
+      border-bottom:2pt solid #16263f !important;
+      display:block !important;
+    }
+    /* 本文エリア */
+    .paper-area{ padding:12pt 0 0 !important; overflow:visible !important; }
+    #content{ max-width:none !important; font-size:12pt !important; line-height:1.9 !important; }
+    #content img{ max-width:100% !important; height:auto !important; }
+    @page{ margin:18mm; size:A4; }
+  }
+</style>
+</head>
+<body class="view-list">
+
+<div class="wrap">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <a class="back" href="index.html">&larr; 小さいラボ</a>
+      <h1><span class="mark">多機能メモ</span></h1>
+      <div class="sub">No.___ / multi-note</div>
+    </div>
+    <button class="newbtn" id="newBtn">＋ 新しいメモ</button>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <section class="main" id="main">
+    <div class="empty-state" id="emptyState">
+      <div class="big">メモがまだありません</div>
+      <p>「＋ 新しいメモ」から始めましょう。<br>書いた内容はこのブラウザに自動保存されます。</p>
+    </div>
+
+    <div class="editor-head" id="editorHead" style="display:none;">
+      <button class="mobile-back" id="mobileBack">&larr; 一覧へ</button>
+      <input id="title" type="text" placeholder="タイトル" autocomplete="off">
+      <div class="toolbar" id="toolbar">
+        <!-- 文字サイズ -->
+        <div class="size-group">
+          <button class="size-btn" data-size="13px">S<span class="s-label">13</span></button>
+          <button class="size-btn" data-size="16px">M<span class="s-label">16</span></button>
+          <button class="size-btn" data-size="22px">L<span class="s-label">22</span></button>
+          <button class="size-btn" data-size="30px">XL<span class="s-label">30</span></button>
+        </div>
+        <div class="divider"></div>
+        <!-- 太字 -->
+        <button class="tool" data-cmd="bold" title="太字"><b>B</b></button>
+        <div class="divider"></div>
+        <!-- 文字色 -->
+        <span class="tool-label">文字色</span>
+        <div class="swatch-group">
+          <button class="swatch" style="background:#16263f" data-fore="#16263f" title="ネイビー"></button>
+          <button class="swatch" style="background:#c0432e" data-fore="#c0432e" title="赤"></button>
+          <button class="swatch" style="background:#1f7a4d" data-fore="#1f7a4d" title="緑"></button>
+          <button class="swatch" style="background:#2257b5" data-fore="#2257b5" title="青"></button>
+        </div>
+        <div class="divider"></div>
+        <!-- マーカー -->
+        <span class="tool-label">マーカー</span>
+        <div class="swatch-group">
+          <button class="swatch" style="background:#ffe94d" data-hl="#ffe94d" title="黄"></button>
+          <button class="swatch" style="background:#a5e8ff" data-hl="#a5e8ff" title="青"></button>
+          <button class="swatch" style="background:#ffc6e0" data-hl="#ffc6e0" title="ピンク"></button>
+          <button class="swatch" style="background:#caffbf" data-hl="#caffbf" title="緑"></button>
+          <button class="tool" data-hl="transparent" title="マーカー消去">⌫</button>
+        </div>
+        <div class="divider"></div>
+        <!-- 画像 -->
+        <button class="tool" id="imgBtn">🖼 画像</button>
+        <input type="file" id="imgInput" accept="image/*" style="display:none;">
+        <div class="divider"></div>
+        <!-- 書き出し -->
+        <button class="tool pdf" id="exPdf" title="PDFで書き出し">⬇ PDF</button>
+        <button class="tool" id="exWord" title="Wordで書き出し">Word</button>
+        <button class="tool" id="exTxt" title="テキストで書き出し">TXT</button>
+        <div class="divider"></div>
+        <!-- 保存状態 -->
+        <span class="savestate" id="saveState">保存済み</span>
+      </div>
+    </div>
+
+    <div class="paper-area" id="paperArea" style="display:none;">
+      <div id="content"
+           contenteditable="true"
+           data-ph="ここに本文を書きます…"
+           autocorrect="on"
+           autocapitalize="sentences"
+           spellcheck="true"></div>
+    </div>
+
+  </section>
+</div>
+
+<!-- モバイル底部ナビ -->
+<div class="bottom-nav" id="bottomNav">
+  <button class="bnav-btn active" id="bnavList">
+    <span class="bnav-icon">📋</span>
+    一覧
+  </button>
+  <button class="bnav-btn" id="bnavNew">
+    <span class="bnav-icon">＋</span>
+    新規
+  </button>
+  <button class="bnav-btn" id="bnavEdit" disabled>
+    <span class="bnav-icon">✏️</span>
+    編集
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const STORE_KEY = "koLabo_memos_v2";
+  const $ = s => document.querySelector(s);
+
+  let memos = [];
+  let currentId = null;
+  let saveTimer = null;
+
+  const listEl    = $("#list");
+  const emptyEl   = $("#emptyState");
+  const editorHead= $("#editorHead");
+  const paperArea = $("#paperArea");
+  const titleEl   = $("#title");
+  const contentEl = $("#content");
+  const saveState = $("#saveState");
+  const bnavEdit  = $("#bnavEdit");
+
+  /* ---------- storage ---------- */
+  function load(){
+    try{ const r=localStorage.getItem(STORE_KEY); memos=r?JSON.parse(r):[]; }
+    catch(e){ memos=[]; }
+  }
+  function persist(){
+    try{ localStorage.setItem(STORE_KEY,JSON.stringify(memos)); return true; }
+    catch(e){ toast("⚠ 保存容量がいっぱいです。大きな画像を減らしてください。"); return false; }
+  }
+
+  /* ---------- helpers ---------- */
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+  function fmtDate(t){
+    const d=new Date(t), p=n=>String(n).padStart(2,"0");
+    return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  function plain(html){ const t=document.createElement("div"); t.innerHTML=html||""; return (t.textContent||"").replace(/\s+/g," ").trim(); }
+  function esc(s){ return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+  let toastTimer2;
+  function toast(msg){
+    const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+    clearTimeout(toastTimer2); toastTimer2=setTimeout(()=>t.classList.remove("show"),2600);
+  }
+
+  /* ---------- mobile view switch ---------- */
+  const isMobile = () => window.innerWidth <= 760;
+  function showView(view){ // 'list' or 'editor'
+    if(!isMobile()) return;
+    document.body.className = view==='editor' ? 'view-editor' : 'view-list';
+    $("#bnavList").classList.toggle("active", view==='list');
+    $("#bnavEdit").classList.toggle("active", view==='editor');
+  }
+
+  /* ---------- show/hide editor ---------- */
+  function showEditor(show){
+    emptyEl.style.display  = show ? "none" : "flex";
+    editorHead.style.display= show ? "block" : "none";
+    paperArea.style.display = show ? "block" : "none";
+    bnavEdit.disabled = !show;
+  }
+
+  /* ---------- render list ---------- */
+  function renderList(){
+    if(memos.length===0){
+      listEl.innerHTML='<div class="list-empty">まだメモはありません。<br>＋ から作成してください。</div>';
+      return;
+    }
+    const sorted=[...memos].sort((a,b)=>b.updated-a.updated);
+    listEl.innerHTML="";
+    sorted.forEach((m,si)=>{
+      const realIdx = memos.indexOf(m);
+      const no = String(realIdx+1).padStart(3,"0");
+      const card=document.createElement("div");
+      card.className="card"+(m.id===currentId?" active":"");
+      const ttl=m.title&&m.title.trim() ? esc(m.title) : '<span class="untitled">無題のメモ</span>';
+      card.innerHTML=
+        `<div class="no">No.${no}</div>`+
+        `<div class="ttl">${ttl}</div>`+
+        `<div class="preview">${esc(plain(m.html).slice(0,70))||"（本文なし）"}</div>`+
+        `<div class="date">${fmtDate(m.updated)}</div>`+
+        `<button class="del" title="削除">✕</button>`;
+      card.addEventListener("click",e=>{
+        if(e.target.classList.contains("del")){e.stopPropagation();removeMemo(m.id);}
+        else openMemo(m.id);
+      });
+      listEl.appendChild(card);
+    });
+  }
+
+  /* ---------- open / new / delete ---------- */
+  function openMemo(id){
+    const m=memos.find(x=>x.id===id); if(!m) return;
+    currentId=id;
+    titleEl.value=m.title||"";
+    contentEl.innerHTML=m.html||"";
+    showEditor(true);
+    showView('editor');
+    renderList();
+    saveState.textContent="保存済み";
+  }
+  function newMemo(){
+    const m={id:uid(),title:"",html:"",updated:Date.now()};
+    memos.push(m); persist(); openMemo(m.id);
+    setTimeout(()=>titleEl.focus(),80);
+  }
+  function removeMemo(id){
+    const m=memos.find(x=>x.id===id); if(!m) return;
+    const label=m.title&&m.title.trim()?`「${m.title}」`:"このメモ";
+    if(!confirm(`${label}を削除します。元に戻せません。よろしいですか?`)) return;
+    memos=memos.filter(x=>x.id!==id); persist();
+    if(currentId===id){ currentId=null; showEditor(false); showView('list'); }
+    renderList(); toast("削除しました");
+  }
+
+  /* ---------- autosave ---------- */
+  function markDirty(){
+    saveState.textContent="入力中…";
+    clearTimeout(saveTimer); saveTimer=setTimeout(saveCurrent,700);
+  }
+  function saveCurrent(){
+    if(!currentId) return;
+    const m=memos.find(x=>x.id===currentId); if(!m) return;
+    m.title=titleEl.value;
+    // 零幅スペース(サイズ変更プレースホルダー)を除去して保存
+    m.html=contentEl.innerHTML.replace(/\u200B/g,"");
+    m.updated=Date.now();
+    if(persist()){ saveState.textContent="保存済み ✓"; }
+    renderList();
+  }
+  titleEl.addEventListener("input",markDirty);
+  contentEl.addEventListener("input",markDirty);
+  ["blur","change"].forEach(ev=>{
+    titleEl.addEventListener(ev,saveCurrent);
+    contentEl.addEventListener(ev,saveCurrent);
+  });
+
+  /* ---------- 文字サイズ ---------- */
+  function updateSizeActive(px){
+    document.querySelectorAll(".size-btn").forEach(b=>{
+      b.classList.toggle("active", b.dataset.size===px);
+    });
+  }
+
+  function applyFontSize(px){
+    contentEl.focus();
+    const sel=window.getSelection();
+    if(!sel||!sel.rangeCount) return;
+    const range=sel.getRangeAt(0);
+
+    if(!range.collapsed){
+      // 選択あり: 選択テキストにサイズを適用
+      document.execCommand("styleWithCSS",false,false);
+      document.execCommand("fontSize",false,"7");
+      [...contentEl.querySelectorAll('font[size="7"]')].forEach(el=>{
+        const span=document.createElement("span");
+        span.style.fontSize=px;
+        while(el.firstChild) span.appendChild(el.firstChild);
+        el.parentNode.replaceChild(span,el);
+      });
+    } else {
+      // 選択なし(入力途中): カーソル位置にspanを挿入してその中で入力
+      const span=document.createElement("span");
+      span.style.fontSize=px;
+      // 零幅スペースでspanを非空にする(空spanにはカーソルが入らないため)
+      span.appendChild(document.createTextNode("​"));
+      range.insertNode(span);
+      // カーソルをspanの末尾に移動
+      const nr=document.createRange();
+      nr.setStart(span.firstChild, span.firstChild.length);
+      nr.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(nr);
+    }
+
+    updateSizeActive(px);
+    markDirty();
+  }
+
+  document.querySelectorAll(".size-btn").forEach(btn=>{
+    btn.addEventListener("mousedown",e=>e.preventDefault());
+    btn.addEventListener("click",()=>applyFontSize(btn.dataset.size));
+    // タッチ対応
+    btn.addEventListener("touchend",e=>{e.preventDefault();applyFontSize(btn.dataset.size);});
+  });
+
+  /* ---------- その他の書式 ---------- */
+  function execFmt(cmd,val){
+    contentEl.focus();
+    document.execCommand("styleWithCSS",false,true);
+    document.execCommand(cmd,false,val);
+    markDirty();
+  }
+  document.querySelectorAll("[data-cmd]").forEach(b=>{
+    b.addEventListener("mousedown",e=>e.preventDefault());
+    b.addEventListener("click",()=>execFmt(b.dataset.cmd));
+    b.addEventListener("touchend",e=>{e.preventDefault();execFmt(b.dataset.cmd);});
+  });
+  document.querySelectorAll("[data-fore]").forEach(b=>{
+    b.addEventListener("mousedown",e=>e.preventDefault());
+    b.addEventListener("click",()=>execFmt("foreColor",b.dataset.fore));
+    b.addEventListener("touchend",e=>{e.preventDefault();execFmt("foreColor",b.dataset.fore);});
+  });
+  document.querySelectorAll("[data-hl]").forEach(b=>{
+    const applyHL=()=>{
+      const c=b.dataset.hl;
+      contentEl.focus();
+      document.execCommand("styleWithCSS",false,true);
+      if(!document.execCommand("hiliteColor",false,c)) document.execCommand("backColor",false,c);
+      markDirty();
+    };
+    b.addEventListener("mousedown",e=>e.preventDefault());
+    b.addEventListener("click",applyHL);
+    b.addEventListener("touchend",e=>{e.preventDefault();applyHL();});
+  });
+
+  /* ---------- 画像 ---------- */
+  $("#imgBtn").addEventListener("click",()=>$("#imgInput").click());
+  $("#imgInput").addEventListener("change",function(){
+    const file=this.files&&this.files[0]; this.value="";
+    if(!file) return;
+    if(file.size>1.5*1024*1024){
+      if(!confirm("画像が大きめ（"+(file.size/1024/1024).toFixed(1)+"MB）です。続けますか?")) return;
+    }
+    const reader=new FileReader();
+    reader.onload=e=>{
+      contentEl.focus();
+      document.execCommand("insertImage",false,e.target.result);
+      markDirty(); saveCurrent();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  /* ---------- 書き出し ---------- */
+  function currentMemo(){ return memos.find(x=>x.id===currentId); }
+  function safeName(){
+    const m=currentMemo();
+    const t=(m&&m.title&&m.title.trim())?m.title.trim():"メモ";
+    return t.replace(/[\\/:*?"<>|]/g,"_").slice(0,40);
+  }
+  function dlBlob(blob,name){
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  function plainML(html){
+    const t=document.createElement("div");
+    t.innerHTML=(html||"").replace(/<div>|<p>|<br\s*\/?>/gi,"\n").replace(/<\/div>|<\/p>/gi,"");
+    return (t.textContent||"").replace(/\n{3,}/g,"\n\n").trim();
+  }
+  $("#exPdf").addEventListener("click", () => {
+    const m=currentMemo(); if(!m) return;
+    saveCurrent();
+    // iOSかどうかで案内メッセージを変える
+    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    if(isIOS){
+      toast("印刷ダイアログ → 左下のPDFボタン or 共有→ファイルに保存");
+    } else {
+      toast("印刷ダイアログが開きます。宛先を「PDFに保存」に変更してください");
+    }
+    setTimeout(()=>window.print(), 300);
+  });
+
+  $("#exWord").addEventListener("click",()=>{
+    const m=currentMemo(); if(!m) return; saveCurrent();
+    const html="<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><style>body{font-family:'Yu Gothic','Hiragino Sans',sans-serif;line-height:1.8;}h1{font-size:22px;}img{max-width:100%;}</style></head><body><h1>"+esc(m.title||"無題")+"</h1>"+(m.html||"")+"</body></html>";
+    dlBlob(new Blob(["\ufeff",html],{type:"application/msword"}),safeName()+".doc");
+    toast("Wordファイルを書き出しました");
+  });
+  $("#exTxt").addEventListener("click",()=>{
+    const m=currentMemo(); if(!m) return; saveCurrent();
+    dlBlob(new Blob([(m.title?m.title+"\n\n":"")+plainML(m.html)],{type:"text/plain;charset=utf-8"}),safeName()+".txt");
+    toast("テキストファイルを書き出しました");
+  });
+
+  /* ---------- ナビゲーション ---------- */
+  $("#newBtn").addEventListener("click",newMemo);
+  $("#mobileBack").addEventListener("click",()=>{ saveCurrent(); showView('list'); });
+  $("#bnavList").addEventListener("click",()=>{ saveCurrent(); showView('list'); });
+  $("#bnavNew").addEventListener("click",newMemo);
+  $("#bnavEdit").addEventListener("click",()=>{ if(currentId) showView('editor'); });
+
+  /* ---------- 起動 ---------- */
+  load(); renderList(); showEditor(false);
+  if(isMobile()) showView('list'); else document.body.className="";
+})();
+</script>
+</body>
+</html>
