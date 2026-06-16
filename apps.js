@@ -13,16 +13,13 @@ const APPS = [
     "published": true
   },
   {
-    "id": "pomodoro",
-    "title": "ポモドーロタイマー",
-    "description": "25分集中して5分休む。それを繰り返すシンプルな集中タイマー。",
-    "tags": [
-      "tool",
-      "timer"
-    ],
+    "id": "pdf",
+    "title": "簡単PDF編集アプリ",
+    "description": "このアプリはPDFを編集することに特化したアプリです",
+    "tags": [],
     "thumbnail": "",
-    "appUrl": "",
-    "githubUrl": "https://github.com/kouki0822/kouki0822.github.io",
+    "appUrl": "pdf-editor.html",
+    "githubUrl": "pdf-editor.html",
     "published": true
   }
 ];
