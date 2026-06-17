@@ -1,0 +1,2438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PDF Editor — ブラウザでPDFを編集</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-jp@5.0.18/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-jp@5.0.16/index.css">
+<style>
+  :root{
+    --ink:#16202b;
+    --ink-soft:#48576b;
+    --surface:#ffffff;
+    --chrome:#1b2531;
+    --chrome-2:#243140;
+    --canvas:#e9ecf1;
+    --line:#d8dde6;
+    --line-soft:#eef1f5;
+    --accent:#3a6df0;
+    --accent-soft:#e7eefd;
+    --warn:#e8552d;
+    --ok:#1f9d6b;
+    --shadow:0 1px 2px rgba(16,28,43,.06),0 8px 24px rgba(16,28,43,.08);
+    --radius:10px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    color:var(--ink);background:var(--canvas);overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  button{font-family:inherit;cursor:pointer}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    height:52px;flex:0 0 auto;background:var(--chrome);color:#eaf0f7;
+    display:flex;align-items:center;gap:10px;padding:0 14px;z-index:40;
+  }
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.3px}
+  .brand .dot{width:11px;height:11px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 3px rgba(58,109,240,.25)}
+  .brand small{font-weight:500;opacity:.6;letter-spacing:0}
+  .top-sp{flex:1}
+  .tbtn{
+    height:34px;border:1px solid transparent;background:var(--chrome-2);color:#dce5f0;
+    border-radius:8px;padding:0 13px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;
+    transition:background .12s,transform .05s;
+  }
+  .tbtn:hover{background:#2d3c4e}
+  .tbtn:active{transform:translateY(1px)}
+  .tbtn.primary{background:var(--accent);color:#fff;border-color:transparent}
+  .tbtn.primary:hover{background:#2f5fe0}
+  .tbtn.ghost{background:transparent}
+  .tbtn.ghost:hover{background:var(--chrome-2)}
+  .tbtn:disabled{opacity:.4;pointer-events:none}
+  .pagenav{display:flex;align-items:center;gap:4px;background:var(--chrome-2);border-radius:8px;padding:3px}
+  .pagenav input{width:42px;height:28px;border:none;border-radius:5px;text-align:center;font-weight:600;font-size:13px;background:#0f1820;color:#eaf0f7}
+  .pagenav .pn-btn{height:28px;width:28px;border:none;border-radius:5px;background:transparent;color:#cdd8e4;font-size:16px}
+  .pagenav .pn-btn:hover{background:#33455a}
+  .zoom{display:flex;align-items:center;gap:2px;background:var(--chrome-2);border-radius:8px;padding:3px}
+  .zoom button{height:28px;width:28px;border:none;border-radius:5px;background:transparent;color:#cdd8e4;font-size:16px}
+  .zoom button:hover{background:#33455a}
+  .zoom span{font-size:12px;font-weight:600;min-width:42px;text-align:center;color:#cdd8e4}
+
+  /* ---------- Layout ---------- */
+  .stage{flex:1;display:flex;min-height:0;position:relative}
+
+  /* ---------- Tool rail ---------- */
+  .rail{
+    width:68px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;overflow-y:auto;z-index:20;
+  }
+  .tool{
+    position:relative;
+    width:52px;height:54px;border:1px solid transparent;background:transparent;border-radius:10px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink-soft);
+    font-size:10px;font-weight:600;transition:background .12s,color .12s,box-shadow .12s;
+  }
+  .tool svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .tool:hover{background:var(--line-soft);color:var(--ink)}
+  .tool.active{background:var(--accent-soft);color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+  .rail-div{width:34px;height:1px;background:var(--line);margin:6px 0}
+
+  /* ---------- Viewer ---------- */
+  .viewer{flex:1;overflow:auto;padding:28px 16px 120px;position:relative;scroll-behavior:smooth}
+  .pageshell{margin:0 auto 22px;position:relative;width:max-content;box-shadow:var(--shadow);background:#fff}
+  .pageshell .pglabel{
+    position:absolute;top:-26px;left:0;
+    display:flex;align-items:center;gap:4px;
+    font-size:11px;font-weight:600;color:var(--ink-soft);white-space:nowrap;
+  }
+  .pg-rot-btn{
+    border:none;background:transparent;padding:0 3px;margin:0;
+    font-size:14px;line-height:1;cursor:pointer;
+    color:var(--ink-soft);border-radius:3px;
+    opacity:0;transition:opacity .15s,background .1s,color .1s;
+  }
+  .pageshell:hover .pg-rot-btn{opacity:1;}
+  .pg-rot-btn:hover{background:var(--accent-soft);color:var(--accent);}
+  @media(pointer:coarse){.pg-rot-btn{opacity:.6;}}
+  .pagecanvas{display:block}
+  /* annolayerはPDFの空白部分ではスクロールを許可する */
+  .annolayer{position:absolute;inset:0;cursor:crosshair;touch-action:pan-x pan-y}
+  .annolayer.select-mode{cursor:default}
+  .annolayer.edit-mode{cursor:text}
+
+  /* annotations */
+  .ann{position:absolute;box-sizing:border-box;touch-action:none}
+  .ann.text{white-space:pre-wrap;line-height:1.3;cursor:move;padding:1px 2px;color:#111;min-width:8px;font-family:'Noto Sans JP',sans-serif;transform-origin:top left;word-break:break-word;box-sizing:border-box;outline:none}
+  .ann.text.mincho{font-family:'Noto Serif JP',serif}
+  .ann.text.maru{font-family:'Kosugi Maru','Noto Sans JP',sans-serif}
+  .ann.text.editing{cursor:text;outline:1px dashed rgba(58,109,240,.7);outline-offset:1px;background:rgba(58,109,240,.05);
+    /* prevent browser from inserting bold/italic/div tags during editing */
+    -webkit-user-modify:read-write-plaintext-only;
+  }
+
+  /* ---- drag-to-select rectangle & multi-text highlight ---- */
+  .drag-sel-rect{
+    position:absolute;pointer-events:none;z-index:50;
+    border:1.5px dashed var(--accent);border-radius:2px;box-sizing:border-box;
+    background:rgba(58,109,240,.07);
+  }
+  .drag-sel-cursor{
+    position:absolute;pointer-events:none;z-index:51;
+    width:18px;height:18px;border-radius:50%;
+    border:2px solid var(--accent);
+    transform:translate(-50%,-50%);
+    animation:dsc-pulse .3s ease-out forwards;
+  }
+  @keyframes dsc-pulse{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.3);}
+    60%{opacity:1;transform:translate(-50%,-50%) scale(1.2);}
+    100%{opacity:.8;transform:translate(-50%,-50%) scale(1);}
+  }
+  .text-selected{
+    background:rgba(58,109,240,.18) !important;
+    outline:1.5px solid rgba(58,109,240,.6);
+    outline-offset:1px;border-radius:2px;
+  }
+
+  /* ---- selection box overlay ---- */
+  .sel-box{
+    position:absolute;pointer-events:none;z-index:30;
+    border:1.5px dashed var(--accent);border-radius:2px;box-sizing:border-box;
+  }
+  /* children explicitly opt back in */
+  .sel-box > *{pointer-events:auto}
+
+  /* Round handles — size controlled by JS via --hsize on the element */
+  .sel-handle{
+    position:absolute;
+    width:var(--hsize,14px);height:var(--hsize,14px);
+    border-radius:50%;
+    background:#fff;border:2px solid var(--accent);
+    box-shadow:0 0 0 1px #fff,0 2px 4px rgba(16,28,43,.2);
+    z-index:31;pointer-events:auto;cursor:nwse-resize;
+    transform:translate(-50%,-50%);
+    /* invisible hit area: extends tap zone without changing look */
+    touch-action:none;
+  }
+  .sel-handle::before{
+    content:'';position:absolute;
+    /* hit area padding = (32px - var(--hsize,14px)) / 2 */
+    inset:calc((var(--hsize,14px) - 32px) / 2);
+    border-radius:50%;
+  }
+  .sel-handle[data-h="n"],.sel-handle[data-h="s"]{cursor:ns-resize}
+  .sel-handle[data-h="w"],.sel-handle[data-h="e"]{cursor:ew-resize}
+  .sel-handle[data-h="nw"],.sel-handle[data-h="se"]{cursor:nwse-resize}
+  .sel-handle[data-h="ne"],.sel-handle[data-h="sw"]{cursor:nesw-resize}
+
+  .sel-rotate{
+    position:absolute;
+    width:var(--hsize,14px);height:var(--hsize,14px);
+    border-radius:50%;
+    background:var(--accent);border:2px solid #fff;
+    box-shadow:0 0 0 1px var(--accent),0 2px 6px rgba(58,109,240,.4);
+    z-index:31;pointer-events:auto;cursor:grab;
+    transform:translate(-50%,-50%);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:8px;touch-action:none;
+  }
+  .sel-rotate::before{
+    content:'';position:absolute;
+    inset:calc((var(--hsize,14px) - 32px) / 2);
+    border-radius:50%;
+  }
+
+  /* ---- floating format bar ---- */
+  .fmt-bar{
+    position:fixed;z-index:70;background:var(--chrome);color:#fff;
+    border-radius:10px;display:flex;align-items:center;gap:1px;padding:4px 6px;
+    box-shadow:0 4px 20px rgba(16,28,43,.45);flex-wrap:nowrap;white-space:nowrap;
+    pointer-events:auto;user-select:none;
+  }
+  .fmt-bar button,.fmt-bar select,.fmt-bar input{
+    height:28px;border:none;border-radius:6px;background:transparent;
+    color:#dce5f0;font-family:inherit;font-size:12px;font-weight:600;
+    padding:0 6px;cursor:pointer;transition:background .1s;
+  }
+  .fmt-bar button:hover,.fmt-bar select:hover{background:var(--chrome-2)}
+  .fmt-bar button.on{background:var(--accent);color:#fff}
+  .fmt-bar select{background:var(--chrome-2);max-width:90px}
+  .fmt-bar input[type=color]{width:28px;padding:0 2px}
+  .fmt-bar input[type=number]{width:40px;background:var(--chrome-2);border-radius:6px;text-align:center;color:#fff}
+  .fmt-bar .size-btn{width:22px;padding:0;font-size:17px;font-weight:300;line-height:1}
+  .fmt-bar .sep{width:1px;height:20px;background:rgba(255,255,255,.15);margin:0 3px;flex-shrink:0}
+  .fmt-bar .drag-handle{cursor:move;color:rgba(255,255,255,.3);padding:0 2px;font-size:16px;line-height:1}
+  .field input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer;margin-top:4px}
+
+  /* mobile: fmt-bar becomes a full-width scrollable bar just above keyboard */
+  @media (max-width:760px){
+    .fmt-bar{
+      left:0 !important;right:0 !important;width:100% !important;
+      bottom:0;top:auto !important;
+      border-radius:10px 10px 0 0 !important;
+      overflow-x:auto;overflow-y:hidden;
+      padding:6px 10px;gap:4px;
+      box-shadow:0 -4px 20px rgba(16,28,43,.3);
+      -webkit-overflow-scrolling:touch;
+    }
+    .fmt-bar .drag-handle{display:none}
+    .fmt-bar button,.fmt-bar select,.fmt-bar input{height:36px;font-size:14px}
+    .fmt-bar input[type=number]{width:52px}
+  }
+  .ann.highlight{background:rgba(255,221,87,.42);mix-blend-mode:multiply;cursor:move}
+  .ann.underline{cursor:move}
+  .ann.underline .ul{position:absolute;left:0;right:0;bottom:1px;height:2px;background:#e8552d}
+  .ann.image img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none}
+  .ann.image{cursor:move}
+  .ann.link{background:rgba(58,109,240,.10);border:1px dashed rgba(58,109,240,.7);cursor:move}
+  .ann.whiteout{background:#fff;cursor:move}
+  .ann.comment{cursor:move;display:flex;align-items:center;justify-content:center}
+  .ann.comment .pin{width:24px;height:24px;border-radius:50% 50% 50% 2px;background:var(--warn);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;transform:rotate(0)}
+
+  /* edit-text run boxes */
+  .runbox{position:absolute;cursor:text;background:transparent;pointer-events:none}
+  .annolayer.edit-mode .runbox{pointer-events:auto;outline:1px dashed rgba(58,109,240,.5);outline-offset:0;background:rgba(58,109,240,.045);border-radius:2px}
+  .annolayer.edit-mode .runbox:hover{background:rgba(58,109,240,.16);outline-color:rgba(58,109,240,.95)}
+
+  /* ---------- Properties panel ---------- */
+  .props{
+    width:264px;flex:0 0 auto;background:var(--surface);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;z-index:20;
+  }
+  .props h3{margin:0;padding:14px 16px;font-size:13px;font-weight:700;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .props .body{padding:14px 16px;overflow-y:auto;flex:1}
+  .empty-hint{color:var(--ink-soft);font-size:12.5px;line-height:1.7}
+  .empty-hint b{color:var(--ink)}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;letter-spacing:.2px}
+  .field input[type=text],.field input[type=url],.field textarea,.field select{
+    width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:13px;color:var(--ink)
+  }
+  .field textarea{resize:vertical;min-height:64px}
+  .swatches{display:flex;gap:7px;flex-wrap:wrap}
+  .sw{width:26px;height:26px;border-radius:7px;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer}
+  .sw.on{box-shadow:0 0 0 2px var(--accent)}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{flex:1;border:none;background:#fff;padding:7px 0;font-size:12px;font-weight:600;color:var(--ink-soft)}
+  .seg button.on{background:var(--accent);color:#fff}
+  .danger{width:100%;border:1px solid #f3c9bd;background:#fdf0ec;color:var(--warn);border-radius:8px;padding:9px;font-weight:700;font-size:13px}
+  .danger:hover{background:#fbe6df}
+
+  /* ---------- Drop zone ---------- */
+  .dropzone{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;
+    background:var(--canvas);z-index:10;text-align:center;padding:24px;
+  }
+  .dropzone .card{
+    background:#fff;border:2px dashed var(--line);border-radius:18px;padding:48px 56px;max-width:520px;
+    transition:border-color .15s,background .15s;
+  }
+  .dropzone.drag .card{border-color:var(--accent);background:var(--accent-soft)}
+  .dz-ico{width:58px;height:58px;margin:0 auto 18px;color:var(--accent)}
+  .dz-ico svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .dropzone h2{margin:0 0 8px;font-size:20px}
+  .dropzone p{margin:0 0 22px;color:var(--ink-soft);font-size:13.5px;line-height:1.7}
+
+  /* ---------- Pages modal ---------- */
+  .modal-bg{position:fixed;inset:0;background:rgba(16,28,43,.5);z-index:80;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-bg.show{display:flex}
+  .modal{background:#fff;border-radius:16px;width:min(820px,100%);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(16,28,43,.4)}
+  .modal header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .modal header h3{margin:0;font-size:16px}
+  .modal .thumbs{padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:16px;overflow-y:auto}
+  .thumb{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f7f8fa;position:relative;cursor:grab}
+  .thumb.dragging{opacity:.4}
+  .thumb.over{outline:2px solid var(--accent)}
+  .thumb canvas{display:block;width:100%}
+  .thumb .tnum{position:absolute;top:6px;left:6px;background:rgba(16,28,43,.8);color:#fff;font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px}
+  .thumb .tacts{position:absolute;top:6px;right:6px;display:flex;gap:4px}
+  .thumb .tacts button{width:26px;height:26px;border:none;border-radius:6px;background:rgba(255,255,255,.92);box-shadow:var(--shadow);font-size:13px;display:flex;align-items:center;justify-content:center}
+  .thumb .tacts button:hover{background:#fff}
+  .thumb.deleted{opacity:.35}
+  .thumb.deleted::after{content:"削除";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(232,85,45,.18);color:var(--warn);font-weight:800;font-size:15px}
+  .modal footer{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .modal footer small{color:var(--ink-soft);font-size:12px}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--chrome);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:120;transition:.25s;box-shadow:var(--shadow);pointer-events:none;max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:var(--warn)}
+  .toast.ok{background:var(--ok)}
+
+  /* loading veil */
+  .veil{position:fixed;inset:0;background:rgba(233,236,241,.85);z-index:130;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+  .veil.show{display:flex}
+  .spinner{width:42px;height:42px;border:4px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .veil p{font-weight:600;color:var(--ink)}
+
+  /* mobile bottom nav */
+  .mnav{display:none}
+  @media (max-width:760px){
+    .rail{position:fixed;bottom:0;left:0;right:0;width:100%;height:64px;flex-direction:row;border-right:none;border-top:1px solid var(--line);padding:0 6px;overflow-x:auto;overflow-y:hidden;justify-content:flex-start;gap:2px;z-index:50}
+    .tool{flex:0 0 auto;height:56px;width:58px}
+    .tool.active::before{display:none}
+    .rail-div{display:none}
+    /* hide bottom rail while fmt-bar is showing (editing mode) */
+    body.editing-text .rail{display:none}
+    .props{position:fixed;right:0;top:52px;bottom:64px;width:min(300px,86vw);transform:translateX(105%);transition:transform .22s;box-shadow:-10px 0 30px rgba(16,28,43,.18);z-index:60;overflow-y:auto}
+    .props.open{transform:translateX(0)}
+    .viewer{padding-bottom:96px}
+    .topbar{gap:6px;padding:0 8px}
+    .brand small{display:none}
+    .topbar .hide-sm{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ TOP BAR ============ -->
+<div class="topbar">
+  <div class="brand"><span class="dot"></span>PDF Editor <small>web</small></div>
+
+  <button class="tbtn ghost" id="btn-open" title="PDFを開く">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+    開く
+  </button>
+
+  <div class="pagenav hide-sm" id="pagenav" style="display:none">
+    <button class="pn-btn" id="pn-prev">‹</button>
+    <input id="pn-input" type="number" min="1" value="1" />
+    <span style="font-size:12px;color:#9fb0c2;padding:0 4px">/ <b id="pn-total">1</b></span>
+    <button class="pn-btn" id="pn-next">›</button>
+    <span style="width:6px"></span>
+    <button class="pn-btn" id="pn-rotl" title="現在ページを左に90°回転">↺</button>
+    <button class="pn-btn" id="pn-rotr" title="現在ページを右に90°回転">↻</button>
+  </div>
+
+  <div class="zoom hide-sm" id="zoombox" style="display:none">
+    <button id="z-out">−</button><span id="z-val">100%</span><button id="z-in">＋</button>
+    <button id="z-fit" title="幅に合わせる" style="width:auto;padding:0 8px;font-size:12px;font-weight:600">幅</button>
+  </div>
+
+  <div id="edit-actions" class="hide-sm" style="display:none;align-items:center;gap:6px;margin-left:4px">
+    <button class="tbtn ghost" id="btn-selectall" title="全選択 (Ctrl+A)" style="font-size:12px;padding:0 10px">全選択</button>
+    <button class="tbtn ghost" id="btn-copytext"  title="コピー (Ctrl+C)"  style="font-size:12px;padding:0 10px">コピー</button>
+  </div>
+
+  <!-- 文字編集モード：ページ内テキスト範囲選択・コピー -->
+  <div id="text-sel-bar" class="hide-sm" style="display:none;align-items:center;gap:6px;margin-left:4px">
+    <button class="tbtn ghost" id="btn-page-selectall" title="ページ全選択 (Ctrl+A)" style="font-size:12px;padding:0 10px">全選択</button>
+    <button class="tbtn ghost" id="btn-copy-sel"       title="選択テキストをコピー"    style="font-size:12px;padding:0 10px;display:none">コピー</button>
+    <button class="tbtn ghost" id="btn-clear-sel"      title="選択解除"                style="font-size:12px;padding:0 10px;display:none">✕</button>
+  </div>
+
+  <div class="top-sp"></div>
+
+  <button class="tbtn ghost" id="btn-pages" disabled title="ページの整理">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="hide-sm">ページ整理</span>
+  </button>
+
+  <button class="tbtn ghost" id="btn-undo" disabled title="元に戻す (Ctrl+Z)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 7"/></svg>
+  </button>
+
+  <button class="tbtn ghost" id="btn-redo" disabled title="やり直し (Ctrl+Shift+Z)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 7"/></svg>
+  </button>
+
+  <button class="tbtn primary" id="btn-export" disabled title="PDFとして書き出す">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+    書き出す
+  </button>
+</div>
+
+<!-- ============ STAGE ============ -->
+<div class="stage">
+
+  <!-- TOOL RAIL -->
+  <div class="rail" id="rail">
+    <button class="tool active" data-tool="select" title="選択・移動">
+      <svg viewBox="0 0 24 24"><path d="M5 3l6.5 16 2-6.5L20 10.5 5 3z"/></svg>選択
+    </button>
+    <button class="tool" data-tool="edit" title="既存テキストを編集">
+      <svg viewBox="0 0 24 24"><path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>文字編集
+    </button>
+    <button class="tool" data-tool="text" title="テキストを追加">
+      <svg viewBox="0 0 24 24"><path d="M4 7V5h16v2"/><path d="M9 5v14"/><path d="M7 19h4"/></svg>文字追加
+    </button>
+    <div class="rail-div"></div>
+    <button class="tool" data-tool="highlight" title="ハイライト">
+      <svg viewBox="0 0 24 24"><path d="M9 11l-4 4v3h3l4-4"/><path d="m13 7 4 4 3-3a2.8 2.8 0 0 0-4-4l-3 3z"/></svg>マーカー
+    </button>
+    <button class="tool" data-tool="underline" title="下線">
+      <svg viewBox="0 0 24 24"><path d="M6 4v6a6 6 0 0 0 12 0V4"/><path d="M5 21h14"/></svg>下線
+    </button>
+    <button class="tool" data-tool="comment" title="コメント">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>コメント
+    </button>
+    <div class="rail-div"></div>
+    <button class="tool" data-tool="image" title="画像を追加">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>画像
+    </button>
+    <button class="tool" data-tool="link" title="リンクを追加">
+      <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>リンク
+    </button>
+  </div>
+
+  <!-- VIEWER -->
+  <div class="viewer" id="viewer">
+    <div class="dropzone" id="dropzone">
+      <div class="card">
+        <div class="dz-ico"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></div>
+        <h2>PDFを開いて編集をはじめる</h2>
+        <p>ファイルをここにドラッグ＆ドロップ、または下のボタンから選択してください。<br>すべてブラウザ内で処理され、ファイルは外部に送信されません。</p>
+        <button class="tbtn primary" id="dz-open" style="height:40px;padding:0 22px">PDFを選択</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROPERTIES -->
+  <div class="props" id="props">
+    <h3>プロパティ <button class="tbtn ghost hide-sm" id="props-close" style="display:none;background:var(--line-soft);color:var(--ink);height:26px;padding:0 8px">×</button></h3>
+    <div class="body" id="props-body">
+      <div class="empty-hint">
+        左のツールから操作を選んでください。<br><br>
+        <b>文字編集</b>：既存の文字をクリックして書き換え<br>
+        <b>文字追加</b>：好きな位置に新しいテキスト<br>
+        <b>マーカー / 下線</b>：ドラッグした範囲に適用<br>
+        <b>画像 / リンク</b>：ドラッグで範囲を指定<br>
+        <b>コメント</b>：クリックでメモを貼り付け<br><br>
+        作った要素は<b>選択ツール</b>で移動・サイズ変更・削除できます。
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ PAGES MODAL ============ -->
+<div class="modal-bg" id="pages-modal">
+  <div class="modal">
+    <header>
+      <h3>ページの整理</h3>
+      <button class="tbtn ghost" id="pages-done" style="background:var(--line-soft);color:var(--ink)">完了</button>
+    </header>
+    <div class="thumbs" id="thumbs"></div>
+    <footer>
+      <small>ドラッグで並べ替え／<span style="color:var(--warn)">🗑</span> 削除・復元／↻ 90°回転</small>
+      <button class="tbtn primary" id="pages-apply">変更を反映</button>
+    </footer>
+  </div>
+</div>
+
+<!-- hidden inputs -->
+<input type="file" id="file-pdf" accept="application/pdf" hidden />
+<input type="file" id="file-img" accept="image/png,image/jpeg" hidden />
+
+<div class="toast" id="toast"></div>
+<div class="veil" id="veil"><div class="spinner"></div><p id="veil-msg">処理中…</p></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   PDF Editor — single file app
+   PDF.js (render) + pdf-lib (write) + fontkit (JP font embed)
+   ============================================================ */
+
+const pdfjsLib = window['pdfjsLib'];
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const { PDFDocument, rgb, degrees, StandardFonts, PDFName, PDFString, PDFArray, PDFNumber } = window.PDFLib;
+
+/* ---------- State ---------- */
+const App = {
+  pdfjsDoc: null,          // pdf.js document
+  srcBytes: null,          // original Uint8Array (for pdf-lib)
+  pages: [],               // page model (in display order)
+  scale: 1.4,
+  tool: 'select',
+  selected: null,          // selected annotation object
+  selectedPage: null,
+  uid: 1,
+  fonts: {},               // embedded font bytes cache by kind
+  fontTried: {},           // attempted kinds
+  fileName: 'edited.pdf',
+  pendingImageRect: null,  // {pageRef, x,y,w,h}
+};
+
+/* page model:
+   { origIndex, rotation(added 0/90/180/270), deleted,
+     wpt, hpt,            // unrotated-view points (= viewport scale1 dims)
+     baseRotate,          // original /Rotate from pdf.js viewport rotation
+     annos: [],           // annotations (points, top-left origin)
+     shell, canvas, layer // DOM refs
+   }
+   annotation:
+   { id, type, x, y, w, h, text, color, size, bold, url,
+     dataUrl, mime, _el }
+*/
+
+/* ---------- DOM helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+const hexToRgb01 = h => { h = h.replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); return [((n>>16)&255)/255,((n>>8)&255)/255,(n&255)/255]; };
+
+let toastTimer;
+function toast(msg, kind){ const t=$('#toast'); t.textContent=msg; t.className='toast show'+(kind?' '+kind:''); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className='toast',2400); }
+function veil(on,msg){ $('#veil').classList.toggle('show',on); if(msg)$('#veil-msg').textContent=msg; }
+
+/* ============================================================
+   Open / Load PDF
+   ============================================================ */
+$('#btn-open').onclick = $('#dz-open').onclick = () => $('#file-pdf').click();
+$('#file-pdf').onchange = e => { const f=e.target.files[0]; if(f) loadPdf(f); e.target.value=''; };
+
+// drag & drop
+const dz = $('#dropzone');
+['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+dz.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f && f.type==='application/pdf') loadPdf(f); else toast('PDFファイルを入れてください','err'); });
+
+async function loadPdf(file){
+  try{
+    veil(true,'PDFを読み込み中…');
+    const buf = await file.arrayBuffer();
+    App.srcBytes = new Uint8Array(buf);
+    // pdf.js needs its own copy (it transfers/consumes the buffer)
+    App.pdfjsDoc = await pdfjsLib.getDocument({ data: App.srcBytes.slice() }).promise;
+
+    App.pages = [];
+    for(let i=1;i<=App.pdfjsDoc.numPages;i++){
+      const pg = await App.pdfjsDoc.getPage(i);
+      const vp = pg.getViewport({scale:1});
+      App.pages.push({
+        origIndex:i-1, rotation:0, deleted:false,
+        wpt:vp.width, hpt:vp.height, baseRotate:pg.rotate||0,
+        annos:[], shell:null, canvas:null, layer:null
+      });
+    }
+    App.selected=null; undoStack=[]; redoStack=[];
+    App.fileName = file.name.replace(/\.pdf$/i,'') + '_edited.pdf';
+    $('#dropzone').style.display='none';
+    $('#pagenav').style.display=''; $('#zoombox').style.display='';
+    $('#btn-pages').disabled=false; $('#btn-export').disabled=false;
+    $('#pn-total').textContent = App.pages.length;
+    await renderAll();
+    veil(false);
+    toast(file.name+' を開きました','ok');
+  }catch(err){ console.error(err); veil(false); toast('読み込みに失敗しました','err'); }
+}
+
+/* ============================================================
+   Render — reuse shells, visible-first, paragraph grouping
+   ============================================================ */
+let _renderGeneration = 0;
+
+function refreshPageLabel(p, n){
+  const lbl = p.shell.querySelector('.pglabel');
+  lbl.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = 'ページ ' + n;
+  const btnL = document.createElement('button');
+  btnL.className = 'pg-rot-btn'; btnL.title = '左に90°回転'; btnL.textContent = '↺';
+  btnL.addEventListener('click', e=>{ e.stopPropagation(); rotatePage(p,-90); });
+  const btnR = document.createElement('button');
+  btnR.className = 'pg-rot-btn'; btnR.title = '右に90°回転'; btnR.textContent = '↻';
+  btnR.addEventListener('click', e=>{ e.stopPropagation(); rotatePage(p, 90); });
+  lbl.appendChild(span); lbl.appendChild(btnL); lbl.appendChild(btnR);
+}
+
+async function rotatePage(p, deg){
+  p.rotation = ((p.rotation + deg) % 360 + 360) % 360;
+  p._textContent = null; // テキスト座標キャッシュをクリア
+  const n = p._dispNum || 1;
+  // シェルサイズをすぐ更新してガタつきを防ぐ
+  const totalRot = ((p.baseRotate+p.rotation)%360+360)%360;
+  const wPx = Math.floor(App.scale * ((totalRot%180===0)?p.wpt:p.hpt));
+  const hPx = Math.floor(App.scale * ((totalRot%180===0)?p.hpt:p.wpt));
+  p.shell.style.width = wPx+'px';
+  p.shell.style.height = hPx+'px';
+  const gen = ++_renderGeneration;
+  await renderPage(p, n, gen);
+  pushHistory();
+  toast(`ページ ${n} を${deg>0?'右':'左'}に 90° 回転`,'ok');
+}
+
+async function renderAll(){
+  const gen = ++_renderGeneration;
+  const viewer = $('#viewer');
+  clearSelBox();
+
+  let n=0;
+  const tasks=[];
+
+  /* ① 削除されたページのシェルを除去 */
+  for(const p of App.pages){
+    if(p.deleted && p.shell){ p.shell.remove(); p.shell=null; p.canvas=null; p.layer=null; }
+  }
+
+  /* ② 生きているページのシェルを作成 or 更新して DOM 順を揃える */
+  for(const p of App.pages){
+    if(p.deleted) continue;
+    n++;
+    const totalRot = ((p.baseRotate+p.rotation)%360+360)%360;
+    const wPx = Math.floor(App.scale * ((totalRot%180===0)?p.wpt:p.hpt));
+    const hPx = Math.floor(App.scale * ((totalRot%180===0)?p.hpt:p.wpt));
+
+    if(!p.shell){
+      /* 初回：シェル新規作成 */
+      const shell=el('div','pageshell');
+      const label=el('div','pglabel');
+      shell.appendChild(label);
+      const canvas=el('canvas','pagecanvas');
+      canvas.style.background='#e8e8e8';
+      shell.appendChild(canvas);
+      const layer=el('div','annolayer');
+      shell.appendChild(layer);
+      p.shell=shell; p.canvas=canvas; p.layer=layer;
+      /* イベントは一度だけ付ける */
+      attachLayerEvents(p);
+    }
+
+    /* ラベル・サイズを更新（使い回しの場合も更新） */
+    p.shell.dataset.disp=n;
+    refreshPageLabel(p,n);
+    p.layer.className='annolayer '+(App.tool==='select'?'select-mode':(App.tool==='edit'?'edit-mode':''));
+    p.shell.style.width =wPx+'px';
+    p.shell.style.height=hPx+'px';   // placeholder height
+    p.canvas.style.width =wPx+'px';
+    p.canvas.style.height=hPx+'px';
+    p.layer.style.visibility='';    // 念のため可視に戻す
+
+    /* appendChildは既にDOMにあれば「移動」になるので順序が整う */
+    viewer.appendChild(p.shell);
+    tasks.push({p,n});
+  }
+  updatePageNav();
+
+  /* ③ 可視ページを先に描画、画面外はバックグラウンドで */
+  const vr=viewer.getBoundingClientRect();
+  const visible=[], deferred=[];
+  for(const t of tasks){
+    const r=t.p.shell.getBoundingClientRect();
+    (r.bottom>=vr.top-600 && r.top<=vr.bottom+600) ? visible.push(t) : deferred.push(t);
+  }
+
+  for(const {p,n} of visible){
+    if(_renderGeneration!==gen) return;
+    await renderPage(p,n,gen);
+  }
+  ;(async()=>{
+    for(const {p,n} of deferred){
+      if(_renderGeneration!==gen) return;
+      await renderPage(p,n,gen);
+    }
+  })();
+}
+
+async function renderPage(p, displayNum, gen){
+  if(gen!==undefined && _renderGeneration!==gen) return;
+  const pg=await App.pdfjsDoc.getPage(p.origIndex+1);
+  const totalRot=((p.baseRotate+p.rotation)%360+360)%360;
+  const vp=pg.getViewport({scale:App.scale, rotation:totalRot});
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+
+  const canvas=p.canvas;
+  canvas.width =Math.floor(vp.width *dpr);
+  canvas.height=Math.floor(vp.height*dpr);
+  canvas.style.width =Math.floor(vp.width) +'px';
+  canvas.style.height=Math.floor(vp.height)+'px';
+  canvas.style.background='';
+  p.shell.style.width =Math.floor(vp.width) +'px';
+  p.shell.style.height='';
+  p._vp=vp; p._dispNum=displayNum;
+
+  await pg.render({
+    canvasContext:canvas.getContext('2d'), viewport:vp,
+    transform:dpr!==1?[dpr,0,0,dpr,0,0]:null
+  }).promise;
+
+  if(gen!==undefined && _renderGeneration!==gen) return;
+
+  p.layer.style.visibility='';
+  await buildRunBoxes(p,pg,vp);
+  renderAnnos(p);
+}
+
+/* ============================================================
+   buildRunBoxes — paragraph-level grouping
+   Step1 raw items → Step2 lines → Step3 line chunks →
+   Step4 paragraph groups → Step5 create runboxes
+   ============================================================ */
+async function buildRunBoxes(p, pg, vp){
+  try{
+    if(!p._textContent) p._textContent=await pg.getTextContent();
+    const tc=p._textContent;
+    p.layer.querySelectorAll('.runbox').forEach(n=>n.remove());
+    p._runs=[];
+
+    /* Step 1 */
+    const rawItems=[];
+    for(const item of tc.items){
+      if(!item.str) continue;
+      const tx=pdfjsLib.Util.transform(vp.transform,item.transform);
+      const fontH=Math.hypot(tx[2],tx[3]);
+      if(fontH<1) continue;
+      const left=tx[4], top=tx[5]-fontH*0.82;
+      const wPx=Math.abs(item.width)*App.scale;
+      const st=tc.styles&&tc.styles[item.fontName];
+      const fam=(st&&st.fontFamily||'').toLowerCase();
+      const fn=(item.fontName||'').toLowerCase();
+      const fw=st&&st.fontWeight;
+      const isBold=(fw&&fw>=600)||fam.includes('bold')||fn.includes('bold')||fn.includes('-bd')||fn.includes('heavy')||fn.includes('black');
+      rawItems.push({
+        str:item.str, left, top, right:left+wPx,
+        h:fontH*1.2, size:fontH/App.scale,
+        font:(fam.includes('serif')&&!fam.includes('sans'))?'mincho':'gothic',
+        bold:isBold
+      });
+    }
+    if(!rawItems.length) return;
+
+    /* ── 上付き・下付き文字の Unicode 変換テーブル ── */
+    const _SUP={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','=':'⁼','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ','a':'ᵃ','b':'ᵇ','c':'ᶜ','d':'ᵈ','e':'ᵉ','f':'ᶠ','g':'ᵍ','h':'ʰ','j':'ʲ','k':'ᵏ','l':'ˡ','m':'ᵐ','o':'ᵒ','p':'ᵖ','r':'ʳ','s':'ˢ','t':'ᵗ','u':'ᵘ','v':'ᵛ','w':'ʷ','x':'ˣ','y':'ʸ','z':'ᶻ'};
+    const _SUB={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','=':'₌','(':'₍',')':'₎','a':'ₐ','e':'ₑ','i':'ᵢ','o':'ₒ','r':'ᵣ','u':'ᵤ','v':'ᵥ','x':'ₓ'};
+    const mapSup=s=>s.split('').map(c=>_SUP[c]??c).join('');
+    const mapSub=s=>s.split('').map(c=>_SUB[c]??c).join('');
+
+    /* Step 2: Y近接でライングループ化
+       閾値 it.h*0.6 で上付き文字を同一行に収める。
+       ① 現在グループの下端より 30% 以上下へはみ出す要素（根号・分母など）は別グループ
+       ② mid 差が it.h*0.6 以内なら同一行とみなす */
+    rawItems.sort((a,b)=>a.top!==b.top?a.top-b.top:a.left-b.left);
+    const lineGroups=[];
+    for(const it of rawItems){
+      const mid=it.top+it.h*0.5;
+      const itBot=it.top+it.h;
+      let found=null;
+      for(const lg of lineGroups){
+        /* ① グループ下端より要素の30%超えてはみ出す場合は除外（分母・根号対策） */
+        if(itBot - lg.bottom > it.h*0.3) continue;
+        /* ② midpoint 距離チェック */
+        if(Math.abs(lg.mid-mid)<it.h*0.6){found=lg;break;}
+      }
+      if(!found){
+        found={mid,h:it.h,top:it.top,bottom:itBot,items:[]};
+        lineGroups.push(found);
+      }
+      found.items.push(it);
+      found.h=Math.max(found.h,it.h);
+      found.top=Math.min(found.top,it.top);
+      found.bottom=Math.max(found.bottom,itBot);
+      /* mid を加重平均で更新（大きいフォントに引き寄せる） */
+      const mainH=found.h;
+      const mains=found.items.filter(i=>i.h>=mainH*0.75);
+      if(mains.length) found.mid=mains.reduce((s,i)=>s+(i.top+i.h*0.5),0)/mains.length;
+    }
+
+    /* Step 3: 同一行内のアイテムをX近接でマージ
+       上付き・下付きを検出して Unicode に変換しコピーテキストを正確に保つ */
+    const lineData=[];
+    for(const lg of lineGroups){
+      /* このラインの「主要フォント」サイズと中心 Y を算出 */
+      const mainH=lg.h;
+      const mainMid=lg.mid;
+
+      lg.items.sort((a,b)=>a.left-b.left);
+      const avgCW=lg.items.reduce((s,i)=>s+i.size,0)/lg.items.length*0.55;
+      const gapMax=Math.max(avgCW*3,12);
+      const chunks=[];
+      let cur=null;
+      for(const it of lg.items){
+        const itMid=it.top+it.h*0.5;
+        const relY=itMid-mainMid;
+        /* 上付き: フォントが主要より小さく、中心が主要より上にある */
+        const isSup=it.h<mainH*0.82 && relY<-mainH*0.08;
+        /* 下付き: フォントが主要より小さく、中心が主要より下にある */
+        const isSub=it.h<mainH*0.82 && relY>mainH*0.12;
+        const itStr=isSup?mapSup(it.str):isSub?mapSub(it.str):it.str;
+
+        if(!cur){cur={...it,str:itStr};}
+        else{
+          const gap=it.left-cur.right;
+          if(gap<=gapMax){
+            /* 上付き・下付きはスペースなしで密着させる */
+            cur.str+=(gap>2&&!isSup&&!isSub?' ':'')+itStr;
+            cur.right=Math.max(cur.right,it.right);
+            cur.h=Math.max(cur.h,it.h);
+            if(it.bold)cur.bold=true;
+          }
+          else{chunks.push(cur);cur={...it,str:itStr};}
+        }
+      }
+      if(cur)chunks.push(cur);
+      if(!chunks.length)continue;
+      const lTop=Math.min(...chunks.map(c=>c.top));
+      const lBot=Math.max(...chunks.map(c=>c.top+c.h));
+      lineData.push({
+        text:chunks.map(c=>c.str).join(' '),
+        top:lTop,bottom:lBot,
+        left:Math.min(...chunks.map(c=>c.left)),
+        right:Math.max(...chunks.map(c=>c.right)),
+        h:lBot-lTop,
+        size:chunks.reduce((s,c)=>s+c.size,0)/chunks.length,
+        font:chunks[0].font,
+        bold:chunks.some(c=>c.bold)
+      });
+    }
+    lineData.sort((a,b)=>a.top-b.top);
+
+    /* Step 4: 縦方向の近接で行を段落にまとめる */
+    const paras=[];
+    let cur=null;
+    for(const ld of lineData){
+      if(!cur){
+        cur={lines:[ld],top:ld.top,bottom:ld.bottom,left:ld.left,right:ld.right,size:ld.size,font:ld.font,bold:ld.bold};
+        paras.push(cur);
+      } else {
+        const gap=ld.top-cur.bottom;
+        /* 段落内の行間は font-size(pt) × scale × 0.6 px 以内
+           （1.8 だと箇条書き複数行が1段落に結合されて巨大 runbox になるため縮小） */
+        const thresh=cur.size*App.scale*0.6;
+        /* 両サイズの大きい方で比較（厳格化）：見出し vs 本文を確実に分離 */
+        const sizeClose=Math.abs(ld.size-cur.size)/Math.max(ld.size,cur.size,1)<0.2;
+        if(gap<=thresh && sizeClose){
+          cur.lines.push(ld);
+          cur.bottom=Math.max(cur.bottom,ld.bottom);
+          cur.left  =Math.min(cur.left,  ld.left);
+          cur.right =Math.max(cur.right, ld.right);
+          cur.size  =(cur.size+ld.size)/2;
+          if(ld.bold)cur.bold=true;
+        } else {
+          cur={lines:[ld],top:ld.top,bottom:ld.bottom,left:ld.left,right:ld.right,size:ld.size,font:ld.font,bold:ld.bold};
+          paras.push(cur);
+        }
+      }
+    }
+
+    /* Step 5: 段落ごとに 1 runbox */
+    for(const para of paras){
+      /* 分数検出: 同一段落内で縦方向に重なる2行が水平中央揃えなら "/" で結合 */
+      const textParts=[];
+      let li=0;
+      while(li<para.lines.length){
+        const ln=para.lines[li], nx=para.lines[li+1];
+        if(nx){
+          const gap=nx.top-ln.bottom;          // 負 = 縦重なり（分数の特徴）
+          const lnCx=(ln.left+ln.right)/2, nxCx=(nx.left+nx.right)/2;
+          const maxW=Math.max(ln.right-ln.left, nx.right-nx.left);
+          /* 分数条件: ① 縦重なり(gap<0) ② 水平中央揃え ③ 近いフォントサイズ */
+          const gapOK = gap < -1 && gap >= -ln.size*App.scale*1.2;
+          const centerOK = maxW>1 && Math.abs(lnCx-nxCx)<maxW*0.45;
+          const sizeOK = Math.abs(ln.size-nx.size)/Math.max(ln.size,nx.size,1)<0.35;
+          if(gapOK && centerOK && sizeOK){
+            textParts.push(ln.text.trim()+'/'+nx.text.trim());
+            li+=2; continue;
+          }
+        }
+        textParts.push(ln.text);
+        li++;
+      }
+      const text=textParts.join('\n');
+      if(!text.trim())continue;
+      const box=el('div','runbox');
+      box.style.cssText=`left:${para.left}px;top:${para.top}px;width:${para.right-para.left}px;height:${para.bottom-para.top}px`;
+      box.dataset.str =text;
+      box.dataset.size=para.size.toFixed(2);
+      box.dataset.font=para.font;
+      box.dataset.bold=para.bold?'1':'0';
+      p.layer.appendChild(box);
+      p._runs.push(box);
+    }
+  }catch(e){console.warn('buildRunBoxes',e);}
+}
+
+function annStyle(a){
+  const s=App.scale;
+  return `left:${a.x*s}px;top:${a.y*s}px;width:${(a.w||0)*s}px;height:${(a.h||0)*s}px`;
+}
+
+function renderAnnos(p){
+  // remove existing ann DOM
+  [...p.layer.querySelectorAll('.ann')].forEach(n=>n.remove());
+  for(const a of p.annos) makeAnnEl(p,a);
+  // restore selection box on this page after re-render
+  if(App.selected && p.annos.includes(App.selected)){
+    App.selectedPage=p;
+    // defer so layout is complete
+    requestAnimationFrame(()=>positionSelBox(App.selected,p));
+  }
+}
+
+/* ============================================================
+   Annotation element creation & style application
+   ============================================================ */
+function fontFamily(f){
+  if(f==='mincho') return "'Noto Serif JP',serif";
+  if(f==='maru')   return "'Kosugi Maru','M PLUS Rounded 1c','Noto Sans JP',sans-serif";
+  return "'Noto Sans JP',sans-serif";
+}
+function hexToRgba(h,al){ const [r,g,b]=hexToRgb01(h); return `rgba(${r*255|0},${g*255|0},${b*255|0},${al})`; }
+
+function applyTextStyle(e,a,s){
+  e.style.left=a.x*s+'px';
+  e.style.top=a.y*s+'px';
+  if(a.w) e.style.width=a.w*s+'px'; else e.style.width='';
+  e.style.fontSize=a.size*s+'px';
+  e.style.lineHeight=a.lineH||1.3;
+  e.style.color=a.color||'#111';
+  e.style.fontWeight=a.bold?700:400;
+  e.style.fontStyle=a.italic?'italic':'normal';
+  e.style.textDecoration=(((a.underline?'underline ':'')+( a.strike?'line-through':'')).trim()||'none');
+  e.style.textAlign=a.align||'left';
+  e.style.fontFamily=fontFamily(a.font);
+  e.style.letterSpacing = a.letterSpacing ? (a.letterSpacing * s) + 'px' : '';
+  e.style.opacity       = (a.opacity != null && a.opacity < 1) ? a.opacity : '';
+  if(a.rotate) e.style.transform=`rotate(${a.rotate}deg)`; else e.style.transform='';
+  if(e.contentEditable!=='true') e.textContent=a.text||'';
+  e.classList.toggle('mincho',a.font==='mincho');
+  e.classList.toggle('maru',  a.font==='maru');
+}
+
+function makeAnnEl(p,a){
+  const s=App.scale;
+  let e;
+  if(a.type==='text'){
+    e=el('div','ann text');
+    applyTextStyle(e,a,s);
+  } else if(a.type==='highlight'){
+    e=el('div','ann highlight');
+    e.style.cssText=annStyle(a)+`;background:${hexToRgba(a.color,.42)}`;
+  } else if(a.type==='underline'){
+    e=el('div','ann underline'); e.style.cssText=annStyle(a);
+    const u=el('div','ul'); u.style.background=a.color; e.appendChild(u);
+  } else if(a.type==='image'){
+    e=el('div','ann image'); e.style.cssText=annStyle(a);
+    const img=el('img'); img.src=a.dataUrl; e.appendChild(img);
+  } else if(a.type==='link'){
+    e=el('div','ann link'); e.style.cssText=annStyle(a); e.title=a.url||'';
+  } else if(a.type==='whiteout'){
+    e=el('div','ann whiteout'); e.style.cssText=annStyle(a);
+  } else if(a.type==='comment'){
+    e=el('div','ann comment'); e.style.cssText=`left:${a.x*s}px;top:${a.y*s}px;width:28px;height:28px`;
+    const pin=el('div','pin'); pin.textContent='💬'; e.appendChild(pin); e.title=a.text||'';
+  }
+  e.dataset.id=a.id; a._el=e;
+  p.layer.appendChild(e);
+  return e;
+}
+
+function applyAnnStyle(a){
+  const s=App.scale, e=a._el; if(!e) return;
+  if(a.type==='text'){ applyTextStyle(e,a,s); refreshSelBox(); }
+  else if(a.type==='comment'){ e.style.left=a.x*s+'px'; e.style.top=a.y*s+'px'; e.title=a.text||''; refreshSelBox(); }
+  else { e.style.left=a.x*s+'px'; e.style.top=a.y*s+'px'; e.style.width=a.w*s+'px'; e.style.height=a.h*s+'px';
+    if(a.type==='highlight') e.style.background=hexToRgba(a.color,.42);
+    if(a.type==='underline'){ const u=e.querySelector('.ul'); if(u)u.style.background=a.color; }
+    if(a.type==='link') e.title=a.url||'';
+    refreshSelBox();
+  }
+}
+
+/* ============================================================
+   Selection box overlay with 8 round handles + rotate handle
+   ============================================================ */
+let _selBox=null, _selPage=null;
+
+function clearSelBox(){
+  if(_selBox){ _selBox.remove(); _selBox=null; }
+  _selPage=null;
+  hideFmtBar();
+}
+
+function refreshSelBox(){
+  if(!App.selected || !_selPage) return;
+  positionSelBox(App.selected, _selPage);
+}
+
+function positionSelBox(a,p){
+  if(_selBox){ _selBox.remove(); _selBox=null; }
+  const e=a._el; if(!e) return;
+  const layer=p.layer;
+  const r=e.getBoundingClientRect();
+  const lr=layer.getBoundingClientRect();
+  const x=r.left-lr.left, y=r.top-lr.top, w=r.width, h=r.height;
+
+  const isMobile = window.innerWidth <= 760;
+  const minDim   = Math.min(w, h);   // screen px
+
+  /* ── Handle size ─────────────────────────────────────────────────
+     Visual size scales *inversely* with zoom so handles stay small
+     when you're zoomed in (where they'd crowd the annotation).
+     On mobile: cap lower (10–13 px) to reduce mis-taps.
+     ──────────────────────────────────────────────────────────────── */
+  const baseSize  = isMobile ? 11 : 14;
+  // shrink as zoom goes up, grow as zoom goes down — but cap
+  const rawSize   = baseSize / Math.pow(App.scale, 0.6);
+  const maxSize   = isMobile ? 13 : 16;
+  const minSize   = isMobile ?  8 : 10;
+  const handlePx  = Math.round(Math.max(minSize, Math.min(maxSize, rawSize)));
+
+  /* ── Handle positions ─────────────────────────────────────────────
+     Mobile always 4 corners only.
+     Desktop uses 8 if annotation is big enough to space them out;
+     falls back to 4 corners for small annotations.
+     ──────────────────────────────────────────────────────────────── */
+  const ALL8 = {nw:[0,0],n:[50,0],ne:[100,0],w:[0,50],e:[100,50],sw:[0,100],s:[50,100],se:[100,100]};
+  const COR4 = {nw:[0,0],ne:[100,0],sw:[0,100],se:[100,100]};
+  const useAll8 = !isMobile && w > 80 && h > 80;
+  const POS = useAll8 ? ALL8 : COR4;
+
+  const box=el('div','sel-box');
+  box.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+  // broadcast handle size as CSS variable so ::before hit area formula works
+  box.style.setProperty('--hsize', handlePx+'px');
+
+  for(const [hk,[px,py]] of Object.entries(POS)){
+    const hEl=el('div','sel-handle'); hEl.dataset.h=hk;
+    hEl.style.left=px+'%'; hEl.style.top=py+'%';
+    // override size individually (CSS var already set on parent)
+    hEl.style.setProperty('--hsize', handlePx+'px');
+    hEl.addEventListener('pointerdown',ev=>startHandleDrag(ev,hk,a,p,w,h));
+    box.appendChild(hEl);
+  }
+
+  /* ── Rotate handle ────────────────────────────────────────────────
+     Hide on mobile when annotation is too small (would overlap handles).
+     ──────────────────────────────────────────────────────────────── */
+  const showRotate = !isMobile || (minDim > 60);
+  if(showRotate){
+    const rot=el('div','sel-rotate'); rot.textContent='↻';
+    const rotPx = handlePx;
+    // Position above the top-centre, offset by handle size + 4px gap
+    rot.style.left='50%';
+    rot.style.top=`-${rotPx + 6}px`;
+    rot.style.setProperty('--hsize', rotPx+'px');
+    const cx=lr.left+x+w/2, cy=lr.top+y+h/2;
+    rot.addEventListener('pointerdown',ev=>startRotateDrag(ev,a,p,cx,cy));
+    box.appendChild(rot);
+  }
+
+  /* 枠線ストリップ方式：4 辺に細い div を配置してドラッグ移動を担当する。
+     中央エリアは pointer-events が届かず下の annotation / contentEditable に素通しになる。
+     これによりテキスト編集中もコンテンツをクリック・テキスト選択できる。 */
+  const GRIP=12; // px — 枠線のつかみ幅
+  [
+    {top:'0',left:'0',right:'0',height:GRIP+'px'},
+    {bottom:'0',left:'0',right:'0',height:GRIP+'px'},
+    {top:'0',left:'0',bottom:'0',width:GRIP+'px'},
+    {top:'0',right:'0',bottom:'0',width:GRIP+'px'},
+  ].forEach(css=>{
+    const strip=document.createElement('div');
+    Object.assign(strip.style,{position:'absolute',pointerEvents:'auto',cursor:'move',...css});
+    strip.addEventListener('pointerdown',ev=>{
+      ev.stopPropagation();
+      if(App.selected && App.selectedPage) startMove(ev,App.selected,App.selectedPage);
+    });
+    box.appendChild(strip);
+  });
+  /* ダブルクリック（select モード）でテキスト編集 */
+  box.addEventListener('dblclick',ev=>{
+    const ann=App.selected, pg=App.selectedPage;
+    if(ann && ann.type==='text' && pg && App.tool==='select'){
+      ev.stopPropagation(); beginEditing(ann,pg);
+    }
+  });
+
+  layer.appendChild(box);
+  _selBox=box; _selPage=p;
+}
+
+function startHandleDrag(ev,hk,a,p,bw,bh){
+  ev.stopPropagation(); ev.preventDefault();
+  const s=App.scale;
+  const sx=ev.clientX, sy=ev.clientY;
+  const x0=a.x, y0=a.y, w0=a.w||bw/s, h0=a.h||bh/s, sz0=a.size||16;
+  const move=m=>{
+    m.preventDefault();
+    const dx=(m.clientX-sx)/s, dy=(m.clientY-sy)/s;
+    if(hk.includes('e'))  a.w=Math.max(10,w0+dx);
+    if(hk.includes('s'))  a.h=Math.max(6, h0+dy);
+    if(hk.includes('w')){ a.x=x0+dx; a.w=Math.max(10,w0-dx); }
+    if(hk.includes('n')){ a.y=y0+dy; a.h=Math.max(6, h0-dy); }
+    if(a.type==='text'){
+      if(hk==='s'||hk==='se'||hk==='sw')  a.size=Math.max(6, sz0*(1+dy/bh));
+      if(hk==='n'||hk==='ne'||hk==='nw')  a.size=Math.max(6, sz0*(1-dy/bh));
+      if(hk==='e'||hk==='w') a.size=Math.max(6, sz0*(1+(hk==='e'?dx:-dx)/(bw)));
+    }
+    applyAnnStyle(a); positionSelBox(a,p);
+    if(a.type==='text') syncFmtBar(a);
+  };
+  const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); pushHistory(); };
+  document.addEventListener('pointermove',move,{passive:false}); document.addEventListener('pointerup',up);
+}
+
+function startRotateDrag(ev,a,p,cx,cy){
+  ev.stopPropagation(); ev.preventDefault();
+  const startAngle=Math.atan2(ev.clientY-cy,ev.clientX-cx);
+  const startRot=a.rotate||0;
+  const move=m=>{
+    m.preventDefault();
+    const ang=Math.atan2(m.clientY-cy,m.clientX-cx);
+    a.rotate=Math.round(startRot+(ang-startAngle)*180/Math.PI);
+    applyAnnStyle(a); positionSelBox(a,p);
+  };
+  const up=()=>{ document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up); pushHistory(); };
+  document.addEventListener('pointermove',move,{passive:false}); document.addEventListener('pointerup',up);
+}
+
+/* ============================================================
+   Floating format bar (font / size / bold / italic / ul / strike / align / color)
+   ============================================================ */
+let _fmtBar=null, _fmtAnn=null;
+const FONT_SIZES=[8,9,10,11,12,14,16,18,20,22,24,28,32,36,48,60,72];
+
+function buildFmtBar(){
+  if(_fmtBar) return;
+  const bar=el('div','fmt-bar');
+  bar.id='fmt-bar';
+  bar.style.display='none'; // hidden until explicitly shown
+  bar.innerHTML=`
+    <span class="drag-handle" title="ドラッグで移動">⠿</span>
+    <select id="fb-font" title="書体">
+      <option value="gothic">ゴシック</option>
+      <option value="mincho">明朝</option>
+      <option value="maru">丸ゴシック</option>
+    </select>
+    <div class="sep"></div>
+    <button id="fb-size-m" class="size-btn" title="サイズ −1pt">−</button>
+    <input id="fb-size" type="number" min="6" max="200" step="1" value="16" title="文字サイズ（pt）">
+    <button id="fb-size-p" class="size-btn" title="サイズ ＋1pt">＋</button>
+    <div class="sep"></div>
+    <button id="fb-bold" title="太字 Ctrl+B"><b>B</b></button>
+    <button id="fb-italic" title="斜体 Ctrl+I"><i>I</i></button>
+    <button id="fb-ul" title="下線 Ctrl+U" style="text-decoration:underline">U</button>
+    <button id="fb-strike" title="取り消し線"><s>S</s></button>
+    <div class="sep"></div>
+    <button id="fb-al" title="左揃え">⬅</button>
+    <button id="fb-ac" title="中央">⬌</button>
+    <button id="fb-ar" title="右揃え">➡</button>
+    <div class="sep"></div>
+    <input id="fb-color" type="color" title="文字色">
+    <div class="sep"></div>
+    <button id="fb-ok" title="確定 Enter" style="color:#7df">✓</button>`;
+  document.body.appendChild(bar);
+  _fmtBar=bar;
+  makeDraggable(bar, bar.querySelector('.drag-handle'));
+
+  bar.querySelector('#fb-font').onchange=()=>fmtCmd('font',bar.querySelector('#fb-font').value);
+  bar.querySelector('#fb-size').oninput =()=>fmtCmd('size',+bar.querySelector('#fb-size').value||16);
+  bar.querySelector('#fb-size-m').onclick=()=>fmtCmd('size',Math.max(6,(+bar.querySelector('#fb-size').value||16)-1));
+  bar.querySelector('#fb-size-p').onclick=()=>fmtCmd('size',Math.min(200,(+bar.querySelector('#fb-size').value||16)+1));
+  bar.querySelector('#fb-bold').onclick  =()=>fmtCmd('bold');
+  bar.querySelector('#fb-italic').onclick=()=>fmtCmd('italic');
+  bar.querySelector('#fb-ul').onclick    =()=>fmtCmd('underline');
+  bar.querySelector('#fb-strike').onclick=()=>fmtCmd('strike');
+  bar.querySelector('#fb-al').onclick    =()=>fmtCmd('align','left');
+  bar.querySelector('#fb-ac').onclick    =()=>fmtCmd('align','center');
+  bar.querySelector('#fb-ar').onclick    =()=>fmtCmd('align','right');
+  bar.querySelector('#fb-color').oninput =()=>fmtCmd('color',bar.querySelector('#fb-color').value);
+  bar.querySelector('#fb-ok').onclick    =()=>commitEditing();
+}
+
+function fmtCmd(cmd,val){
+  const a=_fmtAnn; if(!a) return;
+  if(cmd==='font')     a.font=val;
+  if(cmd==='size')     a.size=Math.max(6,val);
+  if(cmd==='bold')     a.bold=!a.bold;
+  if(cmd==='italic')   a.italic=!a.italic;
+  if(cmd==='underline')a.underline=!a.underline;
+  if(cmd==='strike')   a.strike=!a.strike;
+  if(cmd==='align')    a.align=val;
+  if(cmd==='color')    a.color=val;
+  applyAnnStyle(a);
+  syncFmtBar(a);
+  if(a._el && a._el.contentEditable==='true') a._el.focus();
+}
+
+function syncFmtBar(a){
+  if(!_fmtBar||!a) return;
+  _fmtBar.querySelector('#fb-font').value=a.font||'gothic';
+  _fmtBar.querySelector('#fb-size').value=Math.round(a.size||16);
+  _fmtBar.querySelector('#fb-bold').classList.toggle('on',!!a.bold);
+  _fmtBar.querySelector('#fb-italic').classList.toggle('on',!!a.italic);
+  _fmtBar.querySelector('#fb-ul').classList.toggle('on',!!a.underline);
+  _fmtBar.querySelector('#fb-strike').classList.toggle('on',!!a.strike);
+  ['left','center','right'].forEach(d=>_fmtBar.querySelector('#fb-a'+d[0]).classList.toggle('on',(a.align||'left')===d));
+  try{ _fmtBar.querySelector('#fb-color').value=a.color||'#111111'; }catch(_){}
+}
+
+function showFmtBar(a, anchorEl){
+  buildFmtBar();
+  _fmtAnn=a;
+  syncFmtBar(a);
+  _fmtBar.style.display='flex';
+  const isMobile = window.innerWidth <= 760;
+  if(isMobile){
+    // Mobile: positioned by repositionFmtBar (above keyboard)
+    // Start at bottom=0, keyboard listener will push it up
+    _fmtBar.style.bottom='0';
+    _fmtBar.style.top='auto';
+    _fmtBar.style.left='0';
+    _fmtBar.style.right='0';
+    // slight delay to let keyboard animate up first
+    setTimeout(repositionFmtBar, 200);
+  } else if(anchorEl){
+    const r=anchorEl.getBoundingClientRect();
+    const bw=_fmtBar.offsetWidth||420, bh=_fmtBar.offsetHeight||42;
+    const topbarH=($('.topbar')||{offsetHeight:52}).offsetHeight;
+    let fx=r.left, fy=r.top-bh-12;
+    if(fy < topbarH+8) fy=r.bottom+8;
+    if(fx+bw>window.innerWidth-8) fx=Math.max(8,window.innerWidth-bw-8);
+    _fmtBar.style.left=fx+'px'; _fmtBar.style.top=fy+'px';
+    _fmtBar.style.bottom='auto';
+  }
+}
+
+function hideFmtBar(){
+  if(_fmtBar){ _fmtBar.style.display='none'; }
+  _fmtAnn=null;
+}
+
+function makeDraggable(dragEl,handle){
+  let ox=0,oy=0;
+  handle.addEventListener('pointerdown',ev=>{
+    ox=ev.clientX-dragEl.offsetLeft; oy=ev.clientY-dragEl.offsetTop;
+    const mv=m=>{ dragEl.style.left=(m.clientX-ox)+'px'; dragEl.style.top=(m.clientY-oy)+'px'; };
+    const up=()=>{ document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); };
+    document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
+    ev.preventDefault();
+  });
+}
+
+/* ============================================================
+   WYSIWYG in-place text editing (contentEditable)
+   ============================================================ */
+let _editingAnn=null, _editingPage=null, _ceCb=null, _ceInput=null;
+
+function beginEditing(a,p){
+  if(!a || !a._el) return;
+  if(_editingAnn && _editingAnn!==a) commitEditing();
+  _editingAnn=a; _editingPage=p;
+  const e=a._el;
+  e.classList.add('editing');
+
+  // plaintext-only: prevents browser from inserting <b><i><div> etc.
+  // keeps font/size/weight controlled purely by our CSS
+  try{ e.contentEditable='plaintext-only'; }
+  catch(_){ e.contentEditable='true'; }
+
+  e.style.cursor='text';
+
+  // On mobile: close the right props panel so it doesn't cover the text
+  const isMobile = window.innerWidth <= 760;
+  if(isMobile) $('#props').classList.remove('open');
+
+  document.body.classList.add('editing-text'); // hides bottom rail on mobile
+  showFmtBar(a,e);
+  const ea=$('#edit-actions'); if(ea) ea.style.display='flex';
+
+  setTimeout(()=>{
+    try{
+      e.focus();
+      const range=document.createRange(), sel=window.getSelection();
+      range.selectNodeContents(e); range.collapse(false);
+      sel.removeAllRanges(); sel.addRange(range);
+    }catch(_){}
+    // After keyboard opens, reposition fmt-bar above keyboard
+    if(isMobile) setTimeout(repositionFmtBar, 300);
+  },10);
+
+  e.addEventListener('keydown', _ceCb=ev=>{
+    if(ev.ctrlKey||ev.metaKey){
+      if(ev.key==='b'){ ev.preventDefault(); fmtCmd('bold'); }
+      if(ev.key==='i'){ ev.preventDefault(); fmtCmd('italic'); }
+      if(ev.key==='u'){ ev.preventDefault(); fmtCmd('underline'); }
+      if(ev.key==='Enter'&&!ev.shiftKey){ ev.preventDefault(); commitEditing(); }
+      if(ev.key==='z'){ ev.preventDefault(); ev.shiftKey?redo():undo(); }
+    }
+    if(ev.key==='Escape') commitEditing();
+  });
+  e.addEventListener('input', _ceInput=()=>{
+    // Chromium は contentEditable の innerText 末尾に \n を付加するため除去する
+    a.text = (e.innerText||'').replace(/\n+$/, '');
+    positionSelBox(a,p);
+    syncFmtBar(a);
+  });
+}
+
+/* Reposition fmt-bar just above the on-screen keyboard using visualViewport */
+function repositionFmtBar(){
+  if(!_fmtBar || _fmtBar.style.display==='none') return;
+  if(window.innerWidth > 760) return; // desktop: use normal float positioning
+  const vv = window.visualViewport;
+  if(!vv) return;
+  // kbOffset = how much the keyboard has pushed up the viewport
+  const kbOffset = window.innerHeight - (vv.offsetTop + vv.height);
+  _fmtBar.style.bottom = Math.max(0, kbOffset) + 'px';
+  _fmtBar.style.top = 'auto';
+}
+
+/* Listen for keyboard show/hide on mobile */
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', ()=>{
+    if(window.innerWidth <= 760) repositionFmtBar();
+  });
+  window.visualViewport.addEventListener('scroll', ()=>{
+    if(window.innerWidth <= 760) repositionFmtBar();
+  });
+}
+
+function commitEditing(){
+  const a=_editingAnn, p=_editingPage;
+  // clear state first to avoid re-entrant calls
+  _editingAnn=null; _editingPage=null;
+  if(!a || !a._el) return;
+  const e=a._el;
+  document.body.classList.remove('editing-text');
+  e.contentEditable='false';
+  e.style.cursor='move';
+  e.classList.remove('editing');
+  if(_ceCb){ try{ e.removeEventListener('keydown',_ceCb); }catch(_){} _ceCb=null; }
+  if(_ceInput){ try{ e.removeEventListener('input',_ceInput); }catch(_){} _ceInput=null; }
+  a.text = (e.innerText || '').replace(/\n+$/, '');
+  const _ea=$('#edit-actions'); if(_ea) _ea.style.display='none';
+  if(!a.text.trim()){
+    hideFmtBar();
+    document.body.classList.remove('editing-text');
+    if(p){
+      // whiteout で隠した元テキストも一緒に削除する（履歴は最後に1回だけ積む）
+      if(a._whiteoutId){ const wo=p.annos.find(x=>x.id===a._whiteoutId); if(wo) removeAnn(wo,p,true); }
+      removeAnn(a,p);
+    }
+  } else {
+    e.textContent = a.text;
+    applyTextStyle(e, a, App.scale);
+    hideFmtBar();
+    document.body.classList.remove('editing-text');
+    pushHistory();
+    /* 編集完了後に sel-box を復元する */
+    if(App.selected===a){ App.selectedPage=p; positionSelBox(a,p); }
+  }
+}
+
+
+/* ============================================================
+   Tools / interaction
+   ============================================================ */
+$('#rail').addEventListener('click',e=>{
+  const b=e.target.closest('.tool'); if(!b) return;
+  setTool(b.dataset.tool);
+});
+const TOOL_HINTS={
+  select:'<b>選択ツール</b><br><br>'
+        +'注釈をクリックして選択し、ドラッグで移動・ハンドルでリサイズできます。<br><br>'
+        +'<b>Delete</b> — 削除<br>'
+        +'<b>Escape</b> — 選択解除<br>'
+        +'<b>Ctrl+Z</b> — 元に戻す',
+  edit:  '<b>文字編集ツール</b><br><br>'
+        +'点線で囲まれた箇所を<b>ダブルクリック</b>（タッチは<b>ダブルタップ</b>）すると既存テキストをその場で書き換えられます。<br><br>'
+        +'<b>Enter</b> — 確定 &nbsp;|&nbsp; <b>Escape</b> — キャンセル<br>'
+        +'<b>Shift+Enter</b> — 改行',
+  text:  '<b>文字追加ツール</b><br><br>'
+        +'追加したい位置をクリック（タップ）するとテキストボックスが作られ、すぐ入力できます。<br><br>'
+        +'スタイル・サイズ・色は右パネルまたは上部バーで変更できます。',
+  highlight:'<b>マーカーツール</b><br><br>'
+        +'強調したい文字の範囲を<b>ドラッグ</b>して選択してください。<br><br>'
+        +'色は選択後にプロパティパネルで変更できます。',
+  underline:'<b>下線ツール</b><br><br>'
+        +'下線を引きたい範囲を<b>ドラッグ</b>して指定してください。<br><br>'
+        +'線の色は選択後にプロパティパネルで変更できます。',
+  comment:'<b>コメントツール</b><br><br>'
+        +'メモを残したい位置をクリック（タップ）すると付箋ピンを追加できます。',
+  image: '<b>画像ツール</b><br><br>'
+        +'画像を置きたい範囲を<b>ドラッグ</b>して指定してください。<br><br>'
+        +'ドラッグ後にファイル選択ダイアログが開きます（PNG / JPEG）。',
+  link:  '<b>リンクツール</b><br><br>'
+        +'リンクを設置したい範囲を<b>ドラッグ</b>して指定してください。<br><br>'
+        +'ドラッグ後に URL の入力を求められます。',
+};
+
+function setTool(t){
+  App.tool=t;
+  [...document.querySelectorAll('.tool')].forEach(x=>x.classList.toggle('active',x.dataset.tool===t));
+  App.pages.forEach(p=>{ if(!p.layer) return;
+    p.layer.classList.toggle('select-mode',t==='select');
+    p.layer.classList.toggle('edit-mode',t==='edit');
+  });
+  if(t!=='select') select(null);
+  // 選択中でなければツール専用ガイダンスをパネルに表示
+  if(!App.selected && TOOL_HINTS[t]){
+    $('#props-body').innerHTML=`<div class="empty-hint">${TOOL_HINTS[t]}</div>`;
+  }
+  // 文字編集ツール切り替えでテキスト選択バーを表示/非表示
+  const tsb=$('#text-sel-bar');
+  if(tsb) tsb.style.display = t==='edit' ? 'flex' : 'none';
+  if(t!=='edit') clearTextSel();
+  if(t==='edit') toast('点線の箇所をダブルクリック（タップ）して編集');
+}
+
+function attachLayerEvents(p){
+  const layer=p.layer;
+  layer.addEventListener('pointerdown',ev=>onLayerDown(ev,p));
+  // double-click = enter edit mode on text annotation OR existing run
+  layer.addEventListener('dblclick',ev=>{
+    // existing added text annotation
+    const hit=ev.target.closest('.ann[data-id]');
+    if(hit){
+      const a=p.annos.find(x=>x.id===hit.dataset.id);
+      if(a && a.type==='text'){ ev.preventDefault(); select(a,p); beginEditing(a,p); return; }
+    }
+    // original PDF text run (edit-mode cursor tool active)
+    if(App.tool==='edit'){
+      const rb=ev.target.closest('.runbox');
+      if(rb){ ev.preventDefault(); openRunEditor(rb,p); return; }
+    }
+  });
+}
+
+function layerPoint(ev,p){
+  const r=p.layer.getBoundingClientRect();
+  return { x:(ev.clientX-r.left)/App.scale, y:(ev.clientY-r.top)/App.scale };
+}
+
+/* ============================================================
+   ページ内テキスト範囲選択（複数チャンク）
+   ============================================================ */
+let _textSel = new Set(); // 選択中の DOM 要素 (.runbox / .ann.text)
+
+function clearTextSel(){
+  _textSel.forEach(el=>el.classList.remove('text-selected'));
+  _textSel.clear();
+  updateTextSelUI();
+}
+
+function updateTextSelUI(){
+  const bar=$('#text-sel-bar'); if(!bar) return;
+  const hasItems = _textSel.size > 0;
+  const copyBtn=$('#btn-copy-sel'), clrBtn=$('#btn-clear-sel');
+  if(copyBtn) copyBtn.style.display = hasItems ? '' : 'none';
+  if(clrBtn)  clrBtn.style.display  = hasItems ? '' : 'none';
+}
+
+function getTextSelContent(){
+  // ページ上の位置順（上→下→左→右）でテキストを連結
+  const sorted=[..._textSel].sort((a,b)=>{
+    const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+    if(Math.abs(ra.top-rb.top)>6) return ra.top-rb.top;
+    return ra.left-rb.left;
+  });
+  const parts=[];
+  const used=new Set();
+  for(let i=0;i<sorted.length;i++){
+    if(used.has(i)) continue;
+    const el=sorted[i];
+    const elTxt=el.classList.contains('runbox')?(el.dataset.str||''):(el.innerText||el.textContent||'');
+    // 隣接 runbox との分数検出（Step5 で結合済みでない場合の保険）
+    const nx=sorted[i+1];
+    if(nx&&!used.has(i+1)&&el.classList.contains('runbox')&&nx.classList.contains('runbox')){
+      const ra=el.getBoundingClientRect(), rb=nx.getBoundingClientRect();
+      const gap=rb.top-ra.bottom;
+      const cxA=(ra.left+ra.right)/2, cxB=(rb.left+rb.right)/2;
+      const maxW=Math.max(ra.width,rb.width);
+      const sA=parseFloat(el.dataset.size)||12, sB=parseFloat(nx.dataset.size)||12;
+      const nxTxt=(nx.dataset.str||'').trim();
+      const gapOK=gap<-1&&gap>=-ra.height*0.9;
+      const centerOK=maxW>1&&Math.abs(cxA-cxB)<maxW*0.45;
+      const sizeOK=Math.abs(sA-sB)/Math.max(sA,sB,1)<0.35;
+      const singleOK=!elTxt.includes('\n')&&!nxTxt.includes('\n');
+      if(gapOK&&centerOK&&sizeOK&&singleOK&&nxTxt){
+        parts.push(elTxt.trim()+'/'+nxTxt);
+        used.add(i+1); continue;
+      }
+    }
+    if(elTxt.trim()) parts.push(elTxt.trim());
+  }
+  return parts.filter(Boolean).join('\n');
+}
+
+/* クリップボードに確実に書き込む（Clipboard API + textarea フォールバック） */
+function copyToClipboard(txt){
+  if(!txt) return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt)
+      .then(()=>toast('コピーしました'))
+      .catch(()=>copyViaTextarea(txt));
+  } else {
+    copyViaTextarea(txt);
+  }
+}
+function copyViaTextarea(txt){
+  const ta=document.createElement('textarea');
+  ta.value=txt;
+  ta.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{ document.execCommand('copy'); toast('コピーしました'); }catch(_){}
+  ta.remove();
+}
+
+function selectAllPageText(){
+  const pg=App.pages[curPage()-1];
+  if(!pg||!pg.layer) return;
+  clearTextSel();
+  [...pg.layer.querySelectorAll('.runbox,.ann.text:not(.editing)')].forEach(el=>{
+    el.classList.add('text-selected');
+    _textSel.add(el);
+  });
+  updateTextSelUI();
+  if(_textSel.size) toast(`${_textSel.size} 件のテキストを選択`);
+}
+
+/* 長押し→ドラッグで複数テキストを範囲選択する
+   300 ms 以内に大きく動いた場合はスクロールとみなしてキャンセル */
+function startLongPressDragSelect(ev, p){
+  const HOLD_MS   = 300;
+  const CANCEL_PX = 12;
+  const layer=p.layer;
+  const lr=layer.getBoundingClientRect();
+  const sx=ev.clientX, sy=ev.clientY;
+  let ox=sx-lr.left, oy=sy-lr.top;
+  let phase='waiting'; // 'waiting'|'active'|'cancelled'
+
+  // 長押し中のビジュアルフィードバック（円）
+  const dot=document.createElement('div');
+  dot.className='drag-sel-cursor';
+  dot.style.left=ox+'px'; dot.style.top=oy+'px';
+  layer.appendChild(dot);
+
+  // 選択矩形
+  const rect=document.createElement('div');
+  rect.className='drag-sel-rect';
+  rect.style.cssText=`left:${ox}px;top:${oy}px;width:0;height:0;`;
+  let x2=ox, y2=oy;
+
+  const timer=setTimeout(()=>{
+    if(phase!=='waiting') return;
+    phase='active';
+    dot.remove();
+    clearTextSel();
+    if(_editingAnn) commitEditing();
+    select(null);
+    layer.appendChild(rect);
+    if(navigator.vibrate) navigator.vibrate(20); // モバイル触覚
+  }, HOLD_MS);
+
+  const move=m=>{
+    if(phase==='cancelled') return;
+    const d=Math.hypot(m.clientX-sx, m.clientY-sy);
+    if(phase==='waiting'){
+      if(d>CANCEL_PX){ clearTimeout(timer); phase='cancelled'; dot.remove(); return; }
+      return; // まだ待機中
+    }
+    // active
+    m.preventDefault();
+    x2=m.clientX-lr.left; y2=m.clientY-lr.top;
+    const l=Math.min(ox,x2), t=Math.min(oy,y2);
+    rect.style.left=l+'px'; rect.style.top=t+'px';
+    rect.style.width=Math.abs(x2-ox)+'px'; rect.style.height=Math.abs(y2-oy)+'px';
+  };
+
+  const up=()=>{
+    document.removeEventListener('pointermove',move);
+    document.removeEventListener('pointerup',up);
+    clearTimeout(timer);
+    dot.remove(); rect.remove();
+
+    if(phase!=='active'){
+      // 長押し未到達 → 通常クリック扱い（選択解除）
+      if(_editingAnn) commitEditing();
+      select(null); clearTextSel();
+      return;
+    }
+    // 選択矩形と重なる .runbox / .ann.text を選択
+    const sl=Math.min(ox,x2), st=Math.min(oy,y2);
+    const sr=Math.max(ox,x2), sb=Math.max(oy,y2);
+    if(sr-sl<4 && sb-st<4) return; // ほぼ点なら無視
+
+    [...layer.querySelectorAll('.runbox,.ann.text:not(.editing)')].forEach(el=>{
+      const r=el.getBoundingClientRect();
+      const el_l=r.left-lr.left, el_t=r.top-lr.top;
+      const el_r=el_l+r.width,   el_b=el_t+r.height;
+      if(el_l<sr && el_r>sl && el_t<sb && el_b>st){
+        el.classList.add('text-selected');
+        _textSel.add(el);
+      }
+    });
+    updateTextSelUI();
+    if(_textSel.size) toast(`${_textSel.size} 件を選択　→ コピーボタンでコピー`);
+  };
+
+  document.addEventListener('pointermove',move,{passive:false});
+  document.addEventListener('pointerup',up);
+}
+
+function onLayerDown(ev,p){
+  // ignore clicks inside sel-box handles / rotate handle
+  if(ev.target.closest('.sel-handle,.sel-rotate')) return;
+  // ignore if we're inside a live contenteditable (currently editing)
+  // Note: Chrome uses 'plaintext-only' not 'true', so check any non-false value
+  if(ev.target.closest('[contenteditable="true"],[contenteditable="plaintext-only"]')) return;
+
+  const t=App.tool;
+  const hit=ev.target.closest('.ann');
+
+  if(t==='select' || t==='edit'){
+    if(hit && hit.dataset.id){
+      const a=p.annos.find(x=>x.id===hit.dataset.id);
+      if(a){
+        if(t==='edit' && a.type==='text'){
+          /* edit モード + テキスト注釈 → ワンクリックで即編集開始 */
+          if(App.selected!==a) select(a,p);
+          if(_editingAnn!==a) beginEditing(a,p);
+        } else {
+          /* それ以外は選択のみ。移動は sel-box 枠線ストリップが担当 */
+          if(App.selected!==a) select(a,p);
+        }
+        return;
+      }
+    }
+    /* edit モード: 空白クリック → 長押しドラッグ選択を開始
+       select モード: シングルクリックで選択解除 */
+    if(!hit){
+      if(t==='edit') startLongPressDragSelect(ev,p);
+      else { if(_editingAnn) commitEditing(); select(null); }
+    }
+    return;
+  }
+
+  if(t==='text'){
+    if(_editingAnn) commitEditing();
+    const pt=layerPoint(ev,p);
+    const a={id:'a'+App.uid++,type:'text',x:pt.x,y:pt.y,text:'',color:'#111111',size:16,bold:false,font:'gothic',align:'left',lineH:1.3};
+    p.annos.push(a); makeAnnEl(p,a);
+    select(a,p);
+    beginEditing(a,p);
+    return;
+  }
+
+  if(t==='comment'){
+    const pt=layerPoint(ev,p);
+    const a={id:'a'+App.uid++,type:'comment',x:pt.x-2,y:pt.y-2,text:''};
+    p.annos.push(a); makeAnnEl(p,a); select(a,p);
+    const txt=prompt('コメントを入力');
+    if(txt!==null){ a.text=txt; applyAnnStyle(a); pushHistory(); openProps(a,p); }
+    else removeAnn(a,p);
+    return;
+  }
+
+  if(['highlight','underline','image','link'].includes(t)){
+    /* 既存アノテーションをクリックした場合は選択（sel-box 経由で移動可能になる） */
+    if(hit && hit.dataset.id){
+      const a=p.annos.find(x=>x.id===hit.dataset.id);
+      if(a){ if(App.selected!==a) select(a,p); return; }
+    }
+    startRect(ev,p,t);
+  }
+}
+
+/* move existing annotation
+   ・touch-action:none on .ann → ブラウザスクロールをJS側で制御
+   ・8px閾値 → 微小な揺れでは動かない
+   ・閾値を超えた瞬間に preventDefault でスクロールをキャンセル  */
+function startMove(ev,a,p){
+  const s=App.scale, sx=ev.clientX, sy=ev.clientY, x0=a.x, y0=a.y;
+  let moved=false;
+  const THRESH = 8; // px — この距離を超えてから移動開始
+
+  const move=m=>{
+    const dx=m.clientX-sx, dy=m.clientY-sy;
+    if(!moved && Math.hypot(dx,dy)<THRESH) return; // 閾値未満は無視
+    m.preventDefault(); // スクロールキャンセル（passive:false で登録）
+    moved=true;
+    a.x=x0+dx/s; a.y=y0+dy/s;
+    applyAnnStyle(a);
+    positionSelBox(a,p);
+  };
+  const up=()=>{
+    document.removeEventListener('pointermove',move);
+    document.removeEventListener('pointerup',up);
+    if(moved) pushHistory();
+  };
+  // passive:false が必要（preventDefault を呼ぶため）
+  document.addEventListener('pointermove',move,{passive:false});
+  document.addEventListener('pointerup',up);
+}
+
+/* drag to define a rectangle */
+function startRect(ev,p,type){
+  ev.preventDefault();
+  const start=layerPoint(ev,p);
+  const ghost=el('div','ann '+(type==='link'?'link':type==='image'?'image':type));
+  ghost.style.cssText=`left:${start.x*App.scale}px;top:${start.y*App.scale}px;width:0;height:0`;
+  if(type==='highlight') ghost.style.background='rgba(255,221,87,.42)';
+  p.layer.appendChild(ghost);
+  const move=m=>{
+    const cur=layerPoint(m,p); const s=App.scale;
+    const x=Math.min(start.x,cur.x), y=Math.min(start.y,cur.y), w=Math.abs(cur.x-start.x), h=Math.abs(cur.y-start.y);
+    ghost.style.left=x*s+'px'; ghost.style.top=y*s+'px'; ghost.style.width=w*s+'px'; ghost.style.height=h*s+'px';
+    ghost._r={x,y,w,h};
+  };
+  const up=()=>{
+    document.removeEventListener('pointermove',move); document.removeEventListener('pointerup',up);
+    const r=ghost._r; ghost.remove();
+    if(!r || r.w<4 || r.h<4){ // treat as tiny -> default size for image/link
+      if(type==='image'||type==='link'){ /* require drag */ toast('ドラッグして範囲を指定してください'); }
+      return;
+    }
+    if(type==='underline'){
+      const a={id:'a'+App.uid++,type:'underline',x:r.x,y:r.y,w:r.w,h:Math.max(r.h,4),color:'#e8552d'};
+      p.annos.push(a); makeAnnEl(p,a); select(a,p); pushHistory();
+    } else if(type==='highlight'){
+      const a={id:'a'+App.uid++,type:'highlight',x:r.x,y:r.y,w:r.w,h:r.h,color:'#ffdd57'};
+      p.annos.push(a); makeAnnEl(p,a); select(a,p); pushHistory();
+    } else if(type==='link'){
+      const url=prompt('リンク先URL（https://…）'); if(!url) return;
+      const a={id:'a'+App.uid++,type:'link',x:r.x,y:r.y,w:r.w,h:r.h,url};
+      p.annos.push(a); makeAnnEl(p,a); select(a,p); pushHistory();
+    } else if(type==='image'){
+      App.pendingImageRect={p,r}; $('#file-img').click();
+    }
+  };
+  document.addEventListener('pointermove',move,{passive:false}); document.addEventListener('pointerup',up);
+}
+
+/* image insertion */
+$('#file-img').onchange=e=>{
+  const f=e.target.files[0]; e.target.value='';
+  if(!f || !App.pendingImageRect) return;
+  const {p,r}=App.pendingImageRect; App.pendingImageRect=null;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const a={id:'a'+App.uid++,type:'image',x:r.x,y:r.y,w:r.w,h:r.h,dataUrl:rd.result,mime:f.type};
+    // keep aspect ratio to fit width — pushHistory は比率補正後に1回だけ
+    const im=new Image(); im.onload=()=>{ const ar=im.height/im.width; a.h=r.w*ar; applyAnnStyle(a); pushHistory(); };
+    im.src=rd.result;
+    p.annos.push(a); makeAnnEl(p,a); select(a,p);
+  };
+  rd.readAsDataURL(f);
+};
+
+/* ============================================================
+   Selection
+   ============================================================ */
+function select(a,p){
+  // commit any in-progress edit (defensive: only if editing something different)
+  try{ if(_editingAnn && _editingAnn!==a) commitEditing(); }catch(e){}
+  App.selected = a || null;
+  App.selectedPage = p || null;
+  clearSelBox();
+  if(a && a._el){
+    positionSelBox(a, p);
+    const isMobile = window.innerWidth <= 760;
+    if(a.type==='text'){
+      showFmtBar(a, a._el);
+      // On desktop always show props. On mobile, skip props for text (fmt-bar is enough)
+      if(!isMobile) openProps(a, p);
+    } else {
+      // For images, highlights, links etc: always show props (no fmt-bar needed)
+      hideFmtBar();
+      openProps(a, p);
+    }
+  } else {
+    hideFmtBar();
+    closeProps();
+  }
+}
+
+function removeAnn(a,p,noHistory=false){
+  if(_editingAnn===a) commitEditing();
+  const i=p.annos.indexOf(a); if(i>=0)p.annos.splice(i,1);
+  if(a._el) a._el.remove();
+  if(App.selected===a){ App.selected=null; App.selectedPage=null; clearSelBox(); closeProps(); }
+  if(!noHistory) pushHistory();
+}
+
+/* ---------- existing text run: click to edit in-place ---------- */
+function openRunEditor(rb,p){
+  const left=parseFloat(rb.style.left), top=parseFloat(rb.style.top),
+        w=parseFloat(rb.style.width), h=parseFloat(rb.style.height);
+  const sizePt=parseFloat(rb.dataset.size)||(h/App.scale/1.15);
+  const fontKind=rb.dataset.font||'gothic';
+  const isBold = rb.dataset.bold === '1';   // ← read bold from runbox
+  const orig=rb.dataset.str;
+  const s=App.scale;
+  // whiteout original area, create editable text annotation
+  const wo={id:'a'+App.uid++,type:'whiteout',x:left/s,y:top/s,w:w/s,h:h/s};
+  p.annos.push(wo); makeAnnEl(p,wo);
+  /* w:w/s を設定することで折り返し幅を元の段落と同じにする
+     設定しないと単一の長い行になりズレて見える原因になる */
+  const a={id:'a'+App.uid++,type:'text',x:left/s,y:top/s,text:orig,color:'#111111',
+    size:sizePt, bold:isBold, font:fontKind, w:w/s, lineH:1.3, _whiteoutId:wo.id};
+  p.annos.push(a); makeAnnEl(p,a);
+  select(a,p);
+  beginEditing(a,p);
+}
+
+/* ============================================================
+   Properties panel
+   ============================================================ */
+function closeProps(){
+  const hint=TOOL_HINTS[App.tool]||'左のツールから操作を選んでください。';
+  $('#props-body').innerHTML=`<div class="empty-hint">${hint}</div>`;
+  if(window.matchMedia('(max-width:760px)').matches) $('#props').classList.remove('open');
+}
+
+const PALETTE=['#111111','#e8552d','#1f9d6b','#3a6df0','#9b59b6','#f1c40f','#ffffff'];
+
+function openProps(a,p){
+  const isMobile = window.innerWidth <= 760;
+  // On mobile, right panel only opens for non-text types
+  // (text uses the fmt-bar above keyboard instead)
+  if(isMobile && a.type==='text'){
+    // just update body content silently in case user opens it later
+  } else if(isMobile){
+    $('#props').classList.add('open');
+    $('#props-close').style.display='';
+  }
+  const b=$('#props-body'); b.innerHTML='';
+  const title={text:'テキスト',highlight:'マーカー',underline:'下線',image:'画像',link:'リンク',comment:'コメント',whiteout:'塗りつぶし'}[a.type]||a.type;
+  const head=el('div'); head.style.cssText='font-weight:700;font-size:13px;margin-bottom:12px;color:var(--ink)'; head.textContent=title; b.appendChild(head);
+
+  if(a.type==='text'){
+    // font family
+    addField(b,'書体',()=>{
+      const seg=el('div','seg');
+      [['gothic','ゴシック'],['mincho','明朝'],['maru','丸ゴシック']].forEach(([v,l])=>{
+        const btn=el('button'); btn.textContent=l; btn.style.fontFamily=fontFamily(v);
+        if((a.font||'gothic')===v) btn.classList.add('on');
+        btn.onclick=()=>{ a.font=v; applyAnnStyle(a); syncFmtBar(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // size — number + slider + ±buttons + presets
+    addField(b,'文字サイズ（pt）',()=>{
+      const wrap=el('div');
+      // top row: − input + presets
+      const row=el('div'); row.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap';
+      const btnM=el('button'); btnM.textContent='−';
+      btnM.style.cssText='width:28px;height:28px;border:1px solid var(--line);border-radius:6px;font-size:16px;font-weight:300;flex-shrink:0;display:flex;align-items:center;justify-content:center';
+      const inp=el('input'); inp.type='number'; inp.min=6; inp.max=200; inp.value=Math.round(a.size||16);
+      inp.style.cssText='width:56px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;text-align:center';
+      const btnP=el('button'); btnP.textContent='＋';
+      btnP.style.cssText='width:28px;height:28px;border:1px solid var(--line);border-radius:6px;font-size:16px;font-weight:300;flex-shrink:0;display:flex;align-items:center;justify-content:center';
+      const seg=el('div','seg'); seg.style.marginLeft='auto';
+      [['S',12],['M',16],['L',22],['XL',30]].forEach(([k,v])=>{
+        const btn=el('button'); btn.textContent=k;
+        btn.onclick=()=>{ update(v); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        if(Math.round(a.size||16)===v) btn.classList.add('on');
+        seg.appendChild(btn);
+      });
+      row.appendChild(btnM); row.appendChild(inp); row.appendChild(btnP); row.appendChild(seg);
+      wrap.appendChild(row);
+      // slider
+      const slider=el('input'); slider.type='range'; slider.min=6; slider.max=120; slider.step=1;
+      slider.value=Math.min(120,Math.round(a.size||16));
+      wrap.appendChild(slider);
+      const update=v=>{ v=Math.max(6,Math.min(200,Math.round(v*2)/2)); a.size=v; inp.value=Math.round(v); slider.value=Math.min(120,v); applyAnnStyle(a); syncFmtBar(a); };
+      btnM.onclick=()=>update((+inp.value||16)-1);
+      btnP.onclick=()=>update((+inp.value||16)+1);
+      inp.oninput=()=>update(+inp.value||16);
+      slider.oninput=()=>update(+slider.value);
+      return wrap;
+    });
+    // style buttons
+    addField(b,'スタイル',()=>{
+      const seg=el('div','seg');
+      const defs=[['B','bold'],['I','italic'],['U','underline'],['S','strike']];
+      defs.forEach(([l,k])=>{
+        const btn=el('button'); btn.innerHTML=`<${l==='S'?'s':l==='U'?'u':l==='I'?'i':'b'}>${l}</${l==='S'?'s':l==='U'?'u':l==='I'?'i':'b'}>`;
+        if(a[k]) btn.classList.add('on');
+        btn.onclick=()=>{ a[k]=!a[k]; btn.classList.toggle('on',a[k]); applyAnnStyle(a); syncFmtBar(a); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // text align
+    addField(b,'揃え',()=>{
+      const seg=el('div','seg');
+      [['left','←左'],['center','中央'],['right','右→']].forEach(([v,l])=>{
+        const btn=el('button'); btn.textContent=l;
+        if((a.align||'left')===v) btn.classList.add('on');
+        btn.onclick=()=>{ a.align=v; applyAnnStyle(a); syncFmtBar(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // color
+    addColorField(b,'文字色',a.color,v=>{ a.color=v; applyAnnStyle(a); syncFmtBar(a); });
+    // line height
+    addField(b,'行間',()=>{
+      const seg=el('div','seg');
+      [[1.0,'狭'],[1.3,'標準'],[1.6,'広'],[2.0,'2行']].forEach(([v,l])=>{
+        const btn=el('button'); btn.textContent=l;
+        if(Math.abs((a.lineH||1.3)-v)<0.01) btn.classList.add('on');
+        btn.onclick=()=>{ a.lineH=v; applyAnnStyle(a); [...seg.children].forEach(x=>x.classList.remove('on')); btn.classList.add('on'); };
+        seg.appendChild(btn);
+      });
+      return seg;
+    });
+    // letter spacing
+    addField(b,'字間（pt）',()=>{
+      const wrap=el('div');
+      const cur=a.letterSpacing||0;
+      const lbl=el('span'); lbl.style.cssText='font-size:11px;color:var(--ink-soft);float:right';
+      lbl.textContent=cur.toFixed(1)+'pt';
+      const slider=el('input'); slider.type='range'; slider.min=-3; slider.max=20; slider.step=0.5; slider.value=cur;
+      slider.oninput=()=>{ a.letterSpacing=+slider.value; lbl.textContent=(+slider.value).toFixed(1)+'pt'; applyAnnStyle(a); };
+      wrap.appendChild(lbl); wrap.appendChild(slider);
+      return wrap;
+    });
+    // opacity
+    addField(b,'不透明度',()=>{
+      const wrap=el('div');
+      const cur=a.opacity!=null?a.opacity:1;
+      const lbl=el('span'); lbl.style.cssText='font-size:11px;color:var(--ink-soft);float:right';
+      lbl.textContent=Math.round(cur*100)+'%';
+      const slider=el('input'); slider.type='range'; slider.min=10; slider.max=100; slider.step=5; slider.value=Math.round(cur*100);
+      slider.oninput=()=>{ a.opacity=+slider.value/100; lbl.textContent=slider.value+'%'; applyAnnStyle(a); };
+      wrap.appendChild(lbl); wrap.appendChild(slider);
+      return wrap;
+    });
+    // double click hint
+    const hint=el('div','empty-hint'); hint.innerHTML='ダブルクリックでその場編集<br>上部ツールバーでフォント・色を変更';
+    hint.style.marginTop='10px'; b.appendChild(hint);
+
+  } else if(a.type==='highlight'){
+    addColorField(b,'色',a.color,v=>{ a.color=v; applyAnnStyle(a); });
+  } else if(a.type==='underline'){
+    addColorField(b,'色',a.color,v=>{ a.color=v; applyAnnStyle(a); });
+  } else if(a.type==='link'){
+    addTextField(b,'リンク先 URL',a.url,v=>{ a.url=v; applyAnnStyle(a); });
+  } else if(a.type==='comment'){
+    addTextAreaField(b,'コメント',a.text,v=>{ a.text=v; applyAnnStyle(a); });
+  } else if(a.type==='image'){
+    const note=el('div','empty-hint'); note.textContent='ハンドル（●）でサイズ変更・回転、ドラッグで移動'; b.appendChild(note);
+  }
+
+  const del=el('button','danger'); del.textContent='削除'; del.style.marginTop='14px';
+  del.onclick=()=>removeAnn(a,p); b.appendChild(del);
+}
+
+function addField(b,label,buildFn){
+  const f=el('div','field'); f.innerHTML=`<label>${label}</label>`;
+  f.appendChild(buildFn()); b.appendChild(f);
+}
+function addTextField(b,label,val,on){
+  addField(b,label,()=>{
+    const inp=el('input'); inp.type='text'; inp.value=val||'';
+    inp.oninput=()=>on(inp.value); return inp;
+  });
+}
+function addTextAreaField(b,label,val,on){
+  addField(b,label,()=>{
+    const ta=el('textarea'); ta.value=val||''; ta.style.resize='vertical'; ta.style.minHeight='60px';
+    ta.oninput=()=>on(ta.value); return ta;
+  });
+}
+function addColorField(b,label,val,on){
+  addField(b,label,()=>{
+    const wrap=el('div');
+    const sw=el('div','swatches');
+    PALETTE.forEach(c=>{
+      const s=el('div','sw'); s.style.background=c;
+      if(c==='#ffffff') s.style.boxShadow='0 0 0 1px var(--line)';
+      if(c.toLowerCase()===(val||'').toLowerCase()) s.classList.add('on');
+      s.onclick=()=>{ on(c); [...sw.children].forEach(x=>x.classList.remove('on')); s.classList.add('on'); cp.value=c; };
+      sw.appendChild(s);
+    });
+    wrap.appendChild(sw);
+    const cp=el('input'); cp.type='color'; cp.value=(val&&val!=='transparent')?val:'#111111';
+    cp.style.cssText='margin-top:8px;width:100%;height:30px;border:1px solid var(--line);border-radius:8px;background:#fff';
+    cp.oninput=()=>{ on(cp.value); [...sw.children].forEach(x=>x.classList.remove('on')); };
+    wrap.appendChild(cp); return wrap;
+  });
+}
+$('#props-close').onclick=()=>{ $('#props').classList.remove('open'); };
+
+/* keyboard */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    // モーダルが開いていれば閉じる
+    if($('#pages-modal').classList.contains('show')){ $('#pages-modal').classList.remove('show'); e.preventDefault(); return; }
+    // 選択中アノテーションを解除（編集中は commitEditing 内の Escape が先に処理）
+    if(App.selected && !_editingAnn){ select(null); e.preventDefault(); return; }
+  }
+  if((e.key==='Delete'||e.key==='Backspace') && App.selected && !_editingAnn && !/input|textarea/i.test(document.activeElement.tagName)){
+    const p=App.pages.find(pp=>pp.annos.includes(App.selected)); if(p){ removeAnn(App.selected,p); e.preventDefault(); }
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); if(e.shiftKey) redo(); else undo(); }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
+  // Ctrl+A: 文字編集ツールで編集中でなければページ全テキストを選択
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'&&App.tool==='edit'&&!_editingAnn){
+    e.preventDefault(); selectAllPageText();
+  }
+  // Ctrl+C: 複数テキスト選択中はまとめてコピー
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c'&&_textSel.size>0&&!_editingAnn){
+    e.preventDefault(); copyToClipboard(getTextSelContent());
+  }
+});
+// モーダル背景クリックで閉じる
+$('#pages-modal').addEventListener('click',e=>{ if(e.target===$('#pages-modal')) $('#pages-modal').classList.remove('show'); });
+
+/* ============================================================
+   Undo / Redo
+   ============================================================ */
+let undoStack=[], redoStack=[];
+function snapshot(){
+  // capture order + per-page state
+  return JSON.stringify(App.pages.map(p=>({i:p.origIndex,rot:p.rotation,del:p.deleted,
+    annos:p.annos.map(a=>{const c={...a};delete c._el;return c;})})));
+}
+function restore(json){
+  const snap=JSON.parse(json);
+  const byIndex={}; App.pages.forEach(p=>byIndex[p.origIndex]=p);
+  // rebuild order
+  App.pages = snap.map(s=>{ const p=byIndex[s.i]; p.rotation=s.rot; p.deleted=s.del; p.annos=s.annos; return p; });
+  App.selected=null; App.selectedPage=null; clearSelBox(); closeProps();
+  renderAll();
+}
+function pushHistory(){
+  if(undoStack.length===0) undoStack.push(snapshot()); // safety baseline
+  undoStack.push(snapshot());
+  if(undoStack.length>80)undoStack.shift();
+  redoStack=[];
+  updateUndoRedo();
+}
+function undo(){
+  if(undoStack.length<2) return;
+  redoStack.push(undoStack.pop());
+  restore(undoStack[undoStack.length-1]);
+  updateUndoRedo();
+}
+function redo(){
+  if(!redoStack.length) return;
+  const s=redoStack.pop();
+  undoStack.push(s);
+  restore(s);
+  updateUndoRedo();
+}
+function updateUndoRedo(){
+  $('#btn-undo').disabled=undoStack.length<2;
+  $('#btn-redo').disabled=redoStack.length<1;
+}
+$('#btn-undo').onclick=undo;
+$('#btn-redo').onclick=redo;
+
+/* ── ページ内テキスト範囲選択バー ── */
+$('#btn-page-selectall').onclick=()=>selectAllPageText();
+$('#btn-copy-sel').onclick=()=>copyToClipboard(getTextSelContent());
+$('#btn-clear-sel').onclick=()=>clearTextSel();
+
+/* ── 個別注釈編集中の全選択・コピーボタン ── */
+$('#btn-selectall').onclick=()=>{
+  if(!_editingAnn || !_editingAnn._el) return;
+  const el=_editingAnn._el;
+  el.focus();
+  const range=document.createRange();
+  range.selectNodeContents(el);
+  const sel=window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+};
+$('#btn-copytext').onclick=()=>{
+  if(!_editingAnn) return;
+  copyToClipboard(_editingAnn.text||'');
+};
+
+/* ============================================================
+   Zoom & page nav
+   ============================================================ */
+let zoomTimer=null, zoomKeepPage=1;
+
+function setZoom(z, keepPage){
+  const newScale=Math.min(3.5,Math.max(0.4,Math.round(z*100)/100));
+  if(newScale===App.scale) return;
+
+  const ratio=newScale/App.scale;
+  zoomKeepPage=(keepPage===undefined)?curPage():keepPage;
+  App.scale=newScale;
+  $('#z-val').textContent=Math.round(App.scale*100)+'%';
+
+  /* CSS即時プレビュー：
+     ・canvasのCSS widthだけ縮尺変更（再ラスタライズなし＝即時）
+     ・annotationレイヤーは非表示にする（transform:scaleだと文字が浮いて見えるため）
+  */
+  [...$('#viewer').querySelectorAll('.pageshell')].forEach(shell=>{
+    const cv=shell.querySelector('canvas'); if(!cv) return;
+    const cw=parseFloat(cv.style.width)||cv.width;
+    const ch=parseFloat(cv.style.height)||cv.height;
+    cv.style.width =Math.round(cw*ratio)+'px';
+    cv.style.height=Math.round(ch*ratio)+'px';
+    shell.style.width=Math.round(cw*ratio)+'px';
+    const layer=shell.querySelector('.annolayer');
+    if(layer) layer.style.visibility='hidden';  // 浮き防止
+  });
+
+  /* デバウンス後に正しい解像度で再描画
+     シェルを使い回すため前回よりはるかに高速 */
+  clearTimeout(zoomTimer);
+  zoomTimer=setTimeout(async()=>{
+    await renderAll();
+    scrollToPage(zoomKeepPage);
+  }, 280);
+}
+$('#z-in').onclick=()=>setZoom(App.scale+0.2);
+$('#z-out').onclick=()=>setZoom(App.scale-0.2);
+$('#z-fit').onclick=fitWidth;
+function fitWidth(){
+  const p=App.pages.find(pp=>!pp.deleted); if(!p)return;
+  const viewRot=((p.baseRotate+p.rotation)%360+360)%360;
+  const wpts=(viewRot%180===0)?p.wpt:p.hpt;
+  setZoom(($('#viewer').clientWidth-40)/wpts);
+}
+// Ctrl/Cmd + wheel = zoom
+$('#viewer').addEventListener('wheel',e=>{
+  if(e.ctrlKey||e.metaKey){ e.preventDefault(); setZoom(App.scale+(e.deltaY<0?0.12:-0.12)); }
+},{passive:false});
+// pinch zoom (touch)
+let pinch=null;
+const tdist=e=>{const a=e.touches[0],b=e.touches[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);};
+$('#viewer').addEventListener('touchstart',e=>{ if(e.touches.length===2) pinch={d:tdist(e),s:App.scale}; },{passive:true});
+$('#viewer').addEventListener('touchmove',e=>{ if(pinch&&e.touches.length===2){ e.preventDefault(); setZoom(pinch.s*(tdist(e)/pinch.d)); } },{passive:false});
+$('#viewer').addEventListener('touchend',e=>{ if(e.touches.length<2)pinch=null; });
+
+function updatePageNav(){
+  const shells=[...$('#viewer').querySelectorAll('.pageshell')];
+  $('#pn-total').textContent=shells.length;
+}
+$('#pn-prev').onclick=()=>scrollToPage(curPage()-1);
+$('#pn-next').onclick=()=>scrollToPage(curPage()+1);
+$('#pn-input').onchange=()=>scrollToPage(+$('#pn-input').value);
+$('#pn-rotl').onclick=()=>{ const p=App.pages[curPage()-1]; if(p&&!p.deleted) rotatePage(p,-90); };
+$('#pn-rotr').onclick=()=>{ const p=App.pages[curPage()-1]; if(p&&!p.deleted) rotatePage(p, 90); };
+function curPage(){
+  const shells=[...$('#viewer').querySelectorAll('.pageshell')]; const vt=$('#viewer').getBoundingClientRect().top;
+  let best=1,bd=1e9; shells.forEach(s=>{ const d=Math.abs(s.getBoundingClientRect().top-vt-28); if(d<bd){bd=d;best=+s.dataset.disp;} }); return best;
+}
+function scrollToPage(n){
+  const shells=[...$('#viewer').querySelectorAll('.pageshell')]; const s=shells.find(x=>+x.dataset.disp===n);
+  if(s){ s.scrollIntoView({behavior:'smooth',block:'start'}); $('#pn-input').value=n; }
+}
+$('#viewer').addEventListener('scroll',()=>{ $('#pn-input').value=curPage(); });
+
+/* ============================================================
+   Pages modal (reorder / delete / rotate)
+   ============================================================ */
+$('#btn-pages').onclick=openPagesModal;
+$('#pages-done').onclick=()=>$('#pages-modal').classList.remove('show');
+$('#pages-apply').onclick=()=>{
+  // Clear text content cache — rotation changes coordinate space
+  App.pages.forEach(p=>{ p._textContent=null; });
+  $('#pages-modal').classList.remove('show');
+  pushHistory();
+  renderAll();
+  toast('ページ構成を更新しました','ok');
+};
+
+let modalOrder=[]; // working copy of page refs
+async function openPagesModal(){
+  modalOrder=App.pages.slice();
+  const wrap=$('#thumbs'); wrap.innerHTML='';
+  $('#pages-modal').classList.add('show');
+  for(let idx=0; idx<modalOrder.length; idx++){
+    const p=modalOrder[idx];
+    const t=el('div','thumb'); t.draggable=true; t.dataset.idx=idx; if(p.deleted)t.classList.add('deleted');
+    const num=el('div','tnum'); num.textContent=idx+1; t.appendChild(num);
+    const acts=el('div','tacts');
+    const rot=el('button'); rot.textContent='↻'; rot.title='90°回転'; rot.onclick=ev=>{ev.stopPropagation(); p.rotation=(p.rotation+90)%360; thumbRender(t,p);};
+    const del=el('button'); del.textContent='🗑'; del.title='削除/復元'; del.onclick=ev=>{ev.stopPropagation(); p.deleted=!p.deleted; t.classList.toggle('deleted',p.deleted);};
+    acts.appendChild(rot); acts.appendChild(del); t.appendChild(acts);
+    const cv=el('canvas'); t.appendChild(cv); t._canvas=cv; t._p=p;
+    wrap.appendChild(t);
+    await thumbRender(t,p);
+    setupThumbDnd(t);
+  }
+}
+async function thumbRender(t,p){
+  const pg=await App.pdfjsDoc.getPage(p.origIndex+1);
+  const totalRot=((p.baseRotate+p.rotation)%360+360)%360;
+  const vp=pg.getViewport({scale:1,rotation:totalRot});
+  const sc=130/vp.width; const v2=pg.getViewport({scale:sc,rotation:totalRot});
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const cv=t._canvas; cv.width=Math.floor(v2.width*dpr); cv.height=Math.floor(v2.height*dpr);
+  cv.style.width='100%'; cv.style.height='auto';
+  await pg.render({canvasContext:cv.getContext('2d'),viewport:v2,transform:dpr!==1?[dpr,0,0,dpr,0,0]:null}).promise;
+}
+let dragSrc=null;
+function setupThumbDnd(t){
+  t.addEventListener('dragstart',()=>{dragSrc=t;t.classList.add('dragging');});
+  t.addEventListener('dragend',()=>{t.classList.remove('dragging'); [...$('#thumbs').children].forEach(x=>x.classList.remove('over'));});
+  t.addEventListener('dragover',e=>{e.preventDefault(); if(t!==dragSrc)t.classList.add('over');});
+  t.addEventListener('dragleave',()=>t.classList.remove('over'));
+  t.addEventListener('drop',e=>{
+    e.preventDefault(); t.classList.remove('over'); if(!dragSrc||dragSrc===t)return;
+    const wrap=$('#thumbs'); const nodes=[...wrap.children];
+    const from=nodes.indexOf(dragSrc), to=nodes.indexOf(t);
+    if(from<to) wrap.insertBefore(dragSrc,t.nextSibling); else wrap.insertBefore(dragSrc,t);
+    // rebuild modalOrder + App.pages order from DOM
+    const newOrder=[...wrap.children].map(n=>n._p);
+    App.pages=newOrder; modalOrder=newOrder;
+    [...wrap.children].forEach((n,i)=>{ n.dataset.idx=i; n.querySelector('.tnum').textContent=i+1; });
+  });
+}
+
+/* ============================================================
+   Export with pdf-lib
+   ============================================================ */
+$('#btn-export').onclick=exportPdf;
+
+const FONT_URLS={
+  gothic:[
+    "https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans-jp/NotoSansJP_400Regular.ttf",
+    "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-jp@4.5.13/files/noto-sans-jp-japanese-400-normal.woff",
+    "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-jp@4.5.0/japanese-400-normal.woff"
+  ],
+  mincho:[
+    "https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-serif-jp/NotoSerifJP_400Regular.otf",
+    "https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-jp@4.5.11/files/noto-serif-jp-japanese-400-normal.woff",
+    "https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-jp@4.5.0/japanese-400-normal.woff"
+  ],
+  maru:[
+    "https://cdn.jsdelivr.net/npm/@expo-google-fonts/kosugi-maru/KosugiMaru_400Regular.ttf",
+    "https://cdn.jsdelivr.net/npm/@fontsource/kosugi-maru/files/kosugi-maru-all-400-normal.woff"
+  ]
+};
+async function ensureFontBytes(kind){
+  if(App.fonts[kind]) return App.fonts[kind];
+  if(App.fontTried[kind]) return App.fonts[kind]||null;
+  App.fontTried[kind]=true;
+  for(const u of (FONT_URLS[kind]||[])){
+    try{ const r=await fetch(u); if(r.ok){ App.fonts[kind]=new Uint8Array(await r.arrayBuffer()); return App.fonts[kind]; } }catch(e){}
+  }
+  return null;
+}
+
+async function exportPdf(){
+  try{
+    veil(true,'PDFを書き出し中…');
+    const src=await PDFDocument.load(App.srcBytes);
+    const out=await PDFDocument.create();
+    out.registerFontkit(window.fontkit);
+
+    // embed the Japanese fonts that are actually used (gothic / mincho)
+    const fallback=await out.embedFont(StandardFonts.Helvetica);
+    const usedKinds=new Set();
+    App.pages.forEach(p=>{ if(p.deleted)return; p.annos.forEach(a=>{ if(a.type==='text') usedKinds.add(a.font||'gothic'); }); });
+    const fonts={};
+    for(const k of usedKinds){
+      const fb=await ensureFontBytes(k);
+      if(fb){ try{ fonts[k]=await out.embedFont(fb,{subset:true}); }catch(e){ console.warn('font embed failed',k,e); } }
+    }
+    if(usedKinds.size && Object.keys(fonts).length===0){
+      toast('日本語フォントの取得に失敗しました（ネット接続を確認）','err');
+    }
+
+    const imageCache=new Map();
+
+    for(const p of App.pages){
+      if(p.deleted) continue;
+      const [copied]=await out.copyPages(src,[p.origIndex]);
+      out.addPage(copied);
+      const page=out.getPages()[out.getPageCount()-1];
+
+      // apply user rotation on top of existing
+      const baseRot=page.getRotation().angle||0;
+      const newRot=((baseRot+p.rotation)%360+360)%360;
+      page.setRotation(degrees(newRot));
+
+      const {width:Wun,height:Hun}=page.getSize(); // unrotated size
+      const viewRot=((p.baseRotate+p.rotation)%360+360)%360;
+
+      for(const a of p.annos){
+        await drawAnnotation(out,page,a,{Wun,Hun,viewRot,fonts,fallback,imageCache});
+      }
+    }
+
+    const bytes=await out.save();
+    download(bytes,App.fileName||'edited.pdf');
+    veil(false);
+    toast('PDFを書き出しました','ok');
+  }catch(err){ console.error(err); veil(false); toast('書き出しに失敗：'+(err.message||err),'err'); }
+}
+
+/* transform a view-space point (top-left origin, view dims) into
+   pdf-lib unrotated bottom-left coords. Returns {x,y} and draw angle. */
+function viewToPdf(vx,vy,ctx){
+  const {Wun,Hun,viewRot}=ctx;
+  // view dims:
+  let px,py;
+  if(viewRot===0){ px=vx; py=Hun-vy; }
+  else if(viewRot===90){ px=vy; py=vx; }
+  else if(viewRot===180){ px=Wun-vx; py=vy; }
+  else /*270*/{ px=Wun-vy; py=Hun-vx; }
+  return {x:px,y:py};
+}
+
+async function drawAnnotation(out,page,a,ctx){
+  const {viewRot}=ctx;
+  const drawAngle = viewRot? (360-viewRot)%360 : 0; // keep upright after page rotation
+  const ang=degrees(drawAngle);
+
+  if(a.type==='whiteout' || a.type==='highlight' || a.type==='link'){
+    const top=viewToPdf(a.x,a.y,ctx), bot=viewToPdf(a.x,a.y+a.h,ctx), right=viewToPdf(a.x+a.w,a.y,ctx);
+    // for axis-aligned + rotation multiples of 90, compute rect via two corners
+    const xs=[top.x, viewToPdf(a.x+a.w,a.y+a.h,ctx).x, bot.x, right.x];
+    const ys=[top.y, viewToPdf(a.x+a.w,a.y+a.h,ctx).y, bot.y, right.y];
+    const x0=Math.min(...xs), y0=Math.min(...ys), w=Math.max(...xs)-x0, h=Math.max(...ys)-y0;
+    if(a.type==='whiteout'){
+      page.drawRectangle({x:x0,y:y0,width:w,height:h,color:rgb(1,1,1)});
+    } else if(a.type==='highlight'){
+      const [r,g,b]=hexToRgb01(a.color);
+      page.drawRectangle({x:x0,y:y0,width:w,height:h,color:rgb(r,g,b),opacity:0.4});
+    } else if(a.type==='link'){
+      addLink(out,page,x0,y0,w,h,a.url);
+    }
+    return;
+  }
+
+  if(a.type==='underline'){
+    const [r,g,b]=hexToRgb01(a.color);
+    const p1=viewToPdf(a.x, a.y+a.h, ctx);
+    const p2=viewToPdf(a.x+a.w, a.y+a.h, ctx);
+    page.drawLine({start:{x:p1.x,y:p1.y},end:{x:p2.x,y:p2.y},thickness:2,color:rgb(r,g,b)});
+    return;
+  }
+
+  if(a.type==='text'){
+    const font=(ctx.fonts && ctx.fonts[a.font]) || (ctx.fonts && ctx.fonts.gothic) || (ctx.fonts && Object.values(ctx.fonts)[0]) || ctx.fallback;
+    const [r,g,b]=hexToRgb01(a.color);
+    const size=a.size||16;
+    // anchor = top-left of text -> baseline is below by ascent (~0.82 size)
+    const anchor=viewToPdf(a.x, a.y+size*0.82, ctx);
+    const lines=(a.text||'').split('\n');
+    let drawOk=true;
+    lines.forEach((ln,i)=>{
+      try{
+        // offset subsequent lines along the (rotated) writing direction
+        let ox=0, oy=0; const lineGap=size*1.25*i;
+        if(viewRot===0){ oy=-lineGap; }
+        else if(viewRot===90){ ox=lineGap; }
+        else if(viewRot===180){ oy=lineGap; }
+        else { ox=-lineGap; }
+        const opt={x:anchor.x+ox,y:anchor.y+oy,size,font,color:rgb(r,g,b),rotate:ang,
+          opacity:a.opacity!=null?a.opacity:1,
+          characterSpacing:a.letterSpacing||0};
+        page.drawText(ln,opt);
+        if(a.bold){ page.drawText(ln,{...opt,x:opt.x+Math.max(0.3,size*0.03)}); } // faux bold
+      }catch(e){ drawOk=false; }
+    });
+    if(!drawOk) toast('一部の文字を埋め込めませんでした（フォント未対応の可能性）','err');
+    return;
+  }
+
+  if(a.type==='image'){
+    try{
+      let img=ctx.imageCache.get(a.dataUrl);
+      if(!img){
+        const b64=a.dataUrl.split(',')[1]; const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+        img = a.mime==='image/png'? await out.embedPng(bin) : await out.embedJpg(bin);
+        ctx.imageCache.set(a.dataUrl,img);
+      }
+      // bottom-left of image box in view space = (a.x, a.y+a.h)
+      const bl=viewToPdf(a.x, a.y+a.h, ctx);
+      page.drawImage(img,{x:bl.x,y:bl.y,width:a.w,height:a.h,rotate:ang});
+    }catch(e){ console.warn('image draw failed',e); }
+    return;
+  }
+
+  if(a.type==='comment'){
+    // native Text (sticky note) annotation
+    const pos=viewToPdf(a.x, a.y, ctx);
+    try{
+      const annot=out.context.obj({
+        Type:'Annot', Subtype:'Text', Name:'Comment', Open:false,
+        Rect:[pos.x, pos.y-18, pos.x+18, pos.y],
+        Contents:PDFString.of(a.text||''),
+        C:[0.91,0.33,0.18]
+      });
+      const ref=out.context.register(annot);
+      addAnnotRef(out,page,ref);
+    }catch(e){ console.warn('comment failed',e); }
+    return;
+  }
+}
+
+function addLink(out,page,x,y,w,h,url){
+  try{
+    const annot=out.context.obj({
+      Type:'Annot',Subtype:'Link',Rect:[x,y,x+w,y+h],Border:[0,0,0],
+      A:{Type:'Action',S:'URI',URI:PDFString.of(url)}
+    });
+    const ref=out.context.register(annot);
+    addAnnotRef(out,page,ref);
+  }catch(e){ console.warn('link failed',e); }
+}
+function addAnnotRef(out,page,ref){
+  let annots=page.node.Annots();
+  if(!annots){ annots=out.context.obj([]); page.node.set(PDFName.of('Annots'),annots); }
+  annots.push(ref);
+}
+
+function download(bytes,name){
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
+
+/* ---- seed history right after a file fully renders ---- */
+const _renderAll2=renderAll;
+renderAll=async function(){
+  await _renderAll2.apply(this,arguments);
+  if(undoStack.length===0 && App.pages.length){
+    undoStack.push(snapshot()); updateUndoRedo();
+  }
+};
+</script>
+</body>
+</html>
