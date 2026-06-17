@@ -18,8 +18,8 @@ const APPS = [
     "description": "このアプリはPDFを編集することに特化したアプリです",
     "tags": [],
     "thumbnail": "",
-    "appUrl": "pdf-editor23.html",
-    "githubUrl": "pdf-editor23.html",
+    "appUrl": "pdf-editor-23.html",
+    "githubUrl": "pdf-editor-23.html",
     "published": true
   }
 ];
